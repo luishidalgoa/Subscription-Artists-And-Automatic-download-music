@@ -1,0 +1,8 @@
+services:
+  yt-music-downloader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./output:/music
+      - ./config:/app/config
