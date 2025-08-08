@@ -7,3 +7,4 @@ services:
       - ./output:/music
       - ./config:/app/config
       - ./app:/app/app
+    restart: unless-stopped
