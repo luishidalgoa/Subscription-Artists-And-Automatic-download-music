@@ -4,6 +4,10 @@ import logging
 logger = logging.getLogger(__name__)
 import requests
 from typing import Optional
+import mutagen
+from pathlib import Path
+import re
+import unicodedata
 
 def extraer_album(mp3_path: str) -> str | None:
     try:
@@ -14,9 +18,6 @@ def extraer_album(mp3_path: str) -> str | None:
 
 
 def buscar_resultados_deezer(query: str) -> list[dict]:
-    """
-    Hace la búsqueda en Deezer y devuelve la lista de tracks (diccionarios).
-    """
     url = f"https://api.deezer.com/search?q={requests.utils.quote(query)}"
     logger.info(f"[INFO] Buscando en Deezer: {url}")
     try:
@@ -31,7 +32,6 @@ def buscar_resultados_deezer(query: str) -> list[dict]:
         return []
 
 def _download_image(url: str) -> Optional[bytes]:
-    """Descarga una imagen y devuelve los bytes o None en caso de error."""
     try:
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
@@ -41,41 +41,75 @@ def _download_image(url: str) -> Optional[bytes]:
         logger.error("[ERROR] Fallo al descargar imagen: %s", e)
     return None
 
+def extraer_tags(mp3: Path) -> dict[str, str]:
+    audio = mutagen.File(mp3)
+    def get_tag(keys):
+        for k in keys:
+            val = audio.tags.get(k)
+            if val:
+                if isinstance(val, (list, tuple)):
+                    return str(val[0])
+                return str(val)
+        return ""
+    return {
+        "albumartist": get_tag(['TPE2', 'albumartist']),
+        "artist": get_tag(['TPE1', 'artist']),
+        "title": get_tag(['TIT2', 'title']),
+        "album": get_tag(['TALB', 'album']),
+    }
 
-def obtener_portada_album(title: str, artist: str, album: str) -> bytes | None:
+def artista_coincide(albumartist_api: str, artist_api: str, albumartist_mp3: str, artist_mp3: str) -> bool:
     """
-    Busca la portada del álbum usando la API pública de Deezer.
-
-    Estrategia:
-    1) Búsqueda amplia: `artist title album` -> buscar en resultados (pueden ser tracks o albums).
-    2) Si no hay coincidencias, intento estricto: `artist:"{artist}" album:"{album}"`.
-
-    Devuelve los bytes de la imagen o None.
+    Valida si el artista del API Deezer coincide con albumartist o alguno de los artistas (separados por coma) del mp3.
     """
-    artist_norm = artist.strip().casefold()
-    title_norm = title.strip().casefold()
-    album_norm = album.strip().casefold()
+    albumartist_api = albumartist_api.casefold()
+    artist_api = artist_api.casefold()
+    albumartist_mp3 = albumartist_mp3.casefold()
+    artist_mp3 = artist_mp3.casefold()
 
-    # ------------------ 1) Búsqueda amplia: artist + title + album ------------------
-    query = f"{artist} {title} {album}"
+    # Primero compara con albumartist
+    if albumartist_api == albumartist_mp3:
+        return True
+    # Si falla, separa artist_mp3 por coma y compara con cada uno
+    artistas = [a.strip() for a in artist_mp3.split(",")]
+    if artist_api in artistas:
+        return True
+    return False
+
+def obtener_portada_album(mp3: Path) -> Optional[bytes]:
+    tags = extraer_tags(mp3)
+    albumartist = tags['albumartist']
+    artist = tags['artist']
+    title = tags['title']
+    album = tags['album']
+
+    if not album or not artist:
+        logger.warning(f"[WARN] El archivo {mp3} no tiene tags de artista o álbum suficientes")
+        return None
+
+    albumartist_norm = albumartist.casefold()
+    artist_norm = artist.casefold()
+    title_norm = title.casefold()
+    album_norm = album.casefold()
+
+    # 1) Búsqueda amplia
+    query = f"{albumartist} {title} {album}"
     resultados = buscar_resultados_deezer(query)
 
     for entry in resultados:
-        # Si es un track (resultado del /search normal), contiene una clave 'album'
         if "album" in entry:
-            artista = entry.get("artist", {}).get("name", "").strip().casefold()
-            cancion = entry.get("title", "").strip().casefold()
-            nombre_album = entry.get("album", {}).get("title", "").strip().casefold()
+            artista_api = entry.get("album", {}).get("artist", {}).get("name", "").casefold()
+            cancion_api = entry.get("title", "").casefold()
+            nombre_album_api = entry.get("album", {}).get("title", "").casefold()
             portada_url = (
                 entry.get("album", {}).get("cover_xl")
                 or entry.get("album", {}).get("cover_big")
                 or entry.get("album", {}).get("cover_medium")
             )
         else:
-            # Posible objeto album (p.ej. devuelto por /search? q=artist:"..." album:"..."), tiene portada en raíz
-            artista = entry.get("artist", {}).get("name", "").strip().casefold()
-            cancion = ""
-            nombre_album = entry.get("title", "").strip().casefold()
+            artista_api = entry.get("artist", {}).get("name", "").casefold()
+            cancion_api = entry.get("title", "").casefold()
+            nombre_album_api = entry.get("title", "").casefold()  # fallback
             portada_url = (
                 entry.get("cover_xl")
                 or entry.get("cover_big")
@@ -83,33 +117,34 @@ def obtener_portada_album(title: str, artist: str, album: str) -> bytes | None:
             )
 
         if (
-            artista == artist_norm
-            and cancion == title_norm
-            and nombre_album == album_norm
+            artista_api == artist_norm
+            and cancion_api == title_norm
+            and nombre_album_api == album_norm
             and portada_url
         ):
             img = _download_image(portada_url)
             if img:
                 return img
 
-    # ------------------ 2) Intento estricto: artist:"..." album:"..." ------------------
-    query = f'artist:"{artist}" album:"{album}"'
+    # 2) Búsqueda estricta con validación flexible de artista
+    query = f'artist:"{albumartist}" album:"{album}"'
     resultados = buscar_resultados_deezer(query)
 
     for entry in resultados:
-        # Caso: entrada de tipo album (portada en la raiz)
         if "cover_xl" in entry or entry.get("type") == "album":
-            artista = entry.get("artist", {}).get("name", "").strip().casefold()
-            nombre_album = entry.get("title", "").strip().casefold()
+            artista_api = entry.get("artist", {}).get("name", "")
+            nombre_album_api = entry.get("title", "").casefold()
             portada_url = (
                 entry.get("cover_xl")
                 or entry.get("cover_big")
                 or entry.get("cover_medium")
             )
-        # Caso: entrada de tipo track (tiene campo 'album')
         elif "album" in entry:
-            artista = entry.get("artist", {}).get("name", "").strip().casefold()
-            nombre_album = entry.get("album", {}).get("title", "").strip().casefold()
+            artista_api = entry.get("artist", {}).get("name", "")
+            if not artista_api:
+                artista_api = entry.get("album", {}).get("artist", {}).get("name", "")
+
+            nombre_album_api = entry.get("album", {}).get("title", "").casefold()
             portada_url = (
                 entry.get("album", {}).get("cover_xl")
                 or entry.get("album", {}).get("cover_big")
@@ -118,10 +153,48 @@ def obtener_portada_album(title: str, artist: str, album: str) -> bytes | None:
         else:
             continue
 
-        if artista == artist_norm and nombre_album == album_norm and portada_url:
+        def normalize_str(s: str) -> str:
+            s = s.casefold()
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            s = re.sub(r'\s+', ' ', s).strip()
+            return s
+
+        nombre_album_api_norm = normalize_str(nombre_album_api)
+        album_norm_norm = normalize_str(album_norm)
+
+        if artista_coincide(
+                albumartist_api=artista_api,
+                artist_api=artista_api,
+                albumartist_mp3=albumartist_norm,
+                artist_mp3=artist_norm
+            ) and re.search(re.escape(album_norm_norm), nombre_album_api_norm) and portada_url:
             img = _download_image(portada_url)
             if img:
                 return img
 
-    logger.warning("[WARN] No se encontró portada para '%s' de '%s' en álbum '%s'", title, artist, album)
+    # Si no se devolvió portada aún, pero la respuesta no está vacía y algún album coincide
+    if resultados:
+        for entry in resultados:
+            nombre_album_api = ""
+            portada_url = None
+            if "cover_xl" in entry or entry.get("type") == "album":
+                nombre_album_api = entry.get("title", "").casefold()
+                portada_url = (
+                    entry.get("cover_xl")
+                    or entry.get("cover_big")
+                    or entry.get("cover_medium")
+                )
+            elif "album" in entry:
+                nombre_album_api = entry.get("album", {}).get("title", "").casefold()
+                portada_url = (
+                    entry.get("album", {}).get("cover_xl")
+                    or entry.get("album", {}).get("cover_big")
+                    or entry.get("album", {}).get("cover_medium")
+                )
+            
+            if nombre_album_api == album_norm and portada_url:
+                img = _download_image(portada_url)
+                if img:
+                    return img
     return None

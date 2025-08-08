@@ -21,8 +21,8 @@ def procesar_albumes(artista_path: Path):
         mp3s_a_procesar = filtrar_mp3s_por_fecha(mp3s, now, margen_minutos=5)
         if mp3s_a_procesar:
             eliminar_previews(mp3s_a_procesar)
+            mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar, artista_path.name)
             actualizar_portada(mp3s_a_procesar, artista_path.name)
-            renombrar_con_indice_en(mp3s_a_procesar, artista_path.name)
 
 def filtrar_mp3s_por_fecha(mp3s: List[Path], referencia_iso: str, margen_minutos: int = 5) -> List[Path]:
     referencia_dt = datetime.fromisoformat(referencia_iso).replace(tzinfo=timezone.utc)
@@ -32,4 +32,5 @@ def filtrar_mp3s_por_fecha(mp3s: List[Path], referencia_iso: str, margen_minutos
         mtime = datetime.fromtimestamp(mp3.stat().st_mtime, tz=timezone.utc)
         if abs(referencia_dt - mtime) <= margen:
             filtrados.append(mp3)
-    return filtrados
+    #return filtrados
+    return mp3s

@@ -57,38 +57,38 @@ def eliminar_previews(archivos_mp3: list[Path]):
             except Exception as e:
                 logger.error(f"Error al eliminar {archivo.name}: {e}")
 
-def renombrar_con_indice_en(mp3s: list[Path], artista: str):
+def renombrar_con_indice_en(mp3s: list[Path], artista: str) -> list[Path]:
+    renombrados = []
     for i, archivo in enumerate(mp3s, start=1):
-        # Limpiar nombre: quitar si empieza por "##. "
         nombre_limpio = re.sub(r"^\d{2}\. ", "", archivo.name)
         nuevo_nombre = f"{i:02d}. {nombre_limpio}"
         nuevo_path = archivo.with_name(nuevo_nombre)
 
-        # Renombrar si es necesario
         if archivo != nuevo_path:
             archivo.rename(nuevo_path)
             archivo = nuevo_path  # Actualizar referencia
 
-        # Actualizar metadatos
         actualizar_metadatos_por_defecto(archivo, i, artista)
+        renombrados.append(archivo)
+
+    return renombrados
 
 
-def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str):
+def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str) -> Path:
     try:
         audio = EasyID3(archivo)
     except ID3NoHeaderError:
         audio = EasyID3()
 
-    # imprimimos el title del archivo
     logger.info(f"Archivo de musica: {archivo.name}")
-    
+
     audio["tracknumber"] = str(numero)
-    #interprete del album
     audio["albumartist"] = artista
-    # si la etiqueta album esta vacio la rellena con el nombre del album
     if not audio.get("album"):
         audio["album"] = archivo.parent.name
     audio.save(archivo)
+    return archivo
+
     
 
 def actualizar_portada(mp3s: list[Path], artista: str):
@@ -104,7 +104,7 @@ def actualizar_portada(mp3s: list[Path], artista: str):
         title = audio_easy.get("title", [""])[0]
         artist_tag = audio_easy.get("albumartist", [""])[0] or artista
 
-        portada_bytes = obtener_portada_album(title, artist_tag, album)
+        portada_bytes = obtener_portada_album(primer_mp3)
         if not portada_bytes:
             logger.warning(f"[WARN] No se encontró portada para '{title}' de '{artist_tag}' en álbum '{album}'")
             return
