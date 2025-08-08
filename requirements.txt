@@ -1,3 +1,4 @@
 mutagen
 python-dotenv
 schedule
+requests>=2.31.0

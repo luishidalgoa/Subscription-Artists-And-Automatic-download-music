@@ -1,9 +1,9 @@
+# app/utils/audio_utils.py
 from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3, APIC, ID3NoHeaderError
-from typing import Dict
-from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
+import requests
+from typing import Optional
 
 def extraer_album(mp3_path: str) -> str | None:
     try:
@@ -11,105 +11,117 @@ def extraer_album(mp3_path: str) -> str | None:
         return tags.get("album", [None])[0]
     except Exception:
         return None
-"""
-def consultar_metadatos(mp3_path: Path) -> Dict:
+
+
+def buscar_resultados_deezer(query: str) -> list[dict]:
+    """
+    Hace la búsqueda en Deezer y devuelve la lista de tracks (diccionarios).
+    """
+    url = f"https://api.deezer.com/search?q={requests.utils.quote(query)}"
+    logger.info(f"[INFO] Buscando en Deezer: {url}")
     try:
-        audio = EasyID3(mp3_path)
-        title = audio.get("title", [""])[0]
-        artist = audio.get("albumartist", [""])[0]
-        album = audio.get("album", [""])[0]
-
-        logger.info("Metadatos leídos: title=%s, artist=%s, album=%s", title, artist, album)
-
+        resp = requests.get(url, timeout=5)
+        if resp.status_code != 200:
+            logger.warning(f"[WARN] Deezer API respondió con status {resp.status_code}")
+            return []
+        data = resp.json()
+        return data.get("data", [])
     except Exception as e:
-        logger.error(f"[ERROR] No se pudieron leer metadatos: {e}")
-        return {}
+        logger.error(f"[ERROR] Fallo al buscar en Deezer: {e}")
+        return []
 
-    if not title or not artist or not album:
-        logger.warning("Metadatos insuficientes para búsqueda")
-        return {}
-
+def _download_image(url: str) -> Optional[bytes]:
+    """Descarga una imagen y devuelve los bytes o None en caso de error."""
     try:
-        # 🔍 Búsqueda más concreta con título, artista y álbum
-        result = musicbrainzngs.search_recordings(
-            recording=title,
-            artist=artist,
-            release=album,
-            limit=3
-        )
-
-        # 🔎 Imprimir resultado completo para depuración
-        logger.info("Resultado completo de búsqueda MusicBrainz: %s", result)
-
-        recordings = result.get("recording-list", [])
-        if not recordings:
-            logger.warning(f"No se encontraron grabaciones en MusicBrainz para: {title} - {artist} ({album})")
-            return {}
-
-        recording = recordings[0]
-        release = recording.get("release-list", [{}])[0]
-        release_id = release.get("id")
-        tags = recording.get("tag-list", [])
-        genre = tags[0]["name"] if tags else None
-
-        portada = None
-        if release_id:
-            try:
-                portada = musicbrainzngs.get_image_front(release_id)
-            except musicbrainzngs.ResponseError:
-                logger.warning("No se pudo obtener portada para release_id=%s", release_id)
-
-        logger.info("🎵 Género: %s, Portada: %s", genre or "Desconocido", "Disponible" if portada else "No disponible")
-
-        return {
-            "genero": genre,
-            "portada": portada
-        }
-
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            return resp.content
+        logger.warning("[WARN] Fallo al descargar imagen desde Deezer (%s) - status %s", url, resp.status_code)
     except Exception as e:
-        logger.error(f"[ERROR] Fallo al consultar MusicBrainz: {e}")
-        return {}
+        logger.error("[ERROR] Fallo al descargar imagen: %s", e)
+    return None
 
 
-def actualizar_metadatos(mp3_path: Path, datos: Dict, portada: bytes = None):
-    try:
-        audio = EasyID3(mp3_path)
-    except ID3NoHeaderError:
-        audio = EasyID3()
+def obtener_portada_album(title: str, artist: str, album: str) -> bytes | None:
+    """
+    Busca la portada del álbum usando la API pública de Deezer.
 
-    if "genero" in datos and datos["genero"]:
-        audio["genre"] = datos["genero"]
-    audio.save(mp3_path)
+    Estrategia:
+    1) Búsqueda amplia: `artist title album` -> buscar en resultados (pueden ser tracks o albums).
+    2) Si no hay coincidencias, intento estricto: `artist:"{artist}" album:"{album}"`.
 
-    if portada:
-        try:
-            audio_id3 = ID3(mp3_path)
-            audio_id3.delall("APIC")  # Quitar portada anterior
-            audio_id3.add(APIC(
-                encoding=3, mime='image/jpeg', type=3, desc=u'Cover',
-                data=portada
-            ))
-            audio_id3.save(mp3_path)
-        except Exception as e:
-            logger.error(f"[ERROR] No se pudo actualizar la portada: {e}")
+    Devuelve los bytes de la imagen o None.
+    """
+    artist_norm = artist.strip().casefold()
+    title_norm = title.strip().casefold()
+    album_norm = album.strip().casefold()
 
-def obtener_portada_album(title: str, artist: str) -> bytes | None:
-    try:
-        result = musicbrainzngs.search_recordings(
-            recording=title, artist=artist, limit=1
-        )
-        recordings = result.get("recording-list", [])
-        if not recordings:
-            return None
+    # ------------------ 1) Búsqueda amplia: artist + title + album ------------------
+    query = f"{artist} {title} {album}"
+    resultados = buscar_resultados_deezer(query)
 
-        release = recordings[0].get("release-list", [{}])[0]
-        release_id = release.get("id")
-        if not release_id:
-            return None
+    for entry in resultados:
+        # Si es un track (resultado del /search normal), contiene una clave 'album'
+        if "album" in entry:
+            artista = entry.get("artist", {}).get("name", "").strip().casefold()
+            cancion = entry.get("title", "").strip().casefold()
+            nombre_album = entry.get("album", {}).get("title", "").strip().casefold()
+            portada_url = (
+                entry.get("album", {}).get("cover_xl")
+                or entry.get("album", {}).get("cover_big")
+                or entry.get("album", {}).get("cover_medium")
+            )
+        else:
+            # Posible objeto album (p.ej. devuelto por /search? q=artist:"..." album:"..."), tiene portada en raíz
+            artista = entry.get("artist", {}).get("name", "").strip().casefold()
+            cancion = ""
+            nombre_album = entry.get("title", "").strip().casefold()
+            portada_url = (
+                entry.get("cover_xl")
+                or entry.get("cover_big")
+                or entry.get("cover_medium")
+            )
 
-        return musicbrainzngs.get_image_front(release_id)
+        if (
+            artista == artist_norm
+            and cancion == title_norm
+            and nombre_album == album_norm
+            and portada_url
+        ):
+            img = _download_image(portada_url)
+            if img:
+                return img
 
-    except Exception as e:
-        logger.error(f"[ERROR] Fallo al obtener portada del álbum: {e}")
-        return None
-"""
+    # ------------------ 2) Intento estricto: artist:"..." album:"..." ------------------
+    query = f'artist:"{artist}" album:"{album}"'
+    resultados = buscar_resultados_deezer(query)
+
+    for entry in resultados:
+        # Caso: entrada de tipo album (portada en la raiz)
+        if "cover_xl" in entry or entry.get("type") == "album":
+            artista = entry.get("artist", {}).get("name", "").strip().casefold()
+            nombre_album = entry.get("title", "").strip().casefold()
+            portada_url = (
+                entry.get("cover_xl")
+                or entry.get("cover_big")
+                or entry.get("cover_medium")
+            )
+        # Caso: entrada de tipo track (tiene campo 'album')
+        elif "album" in entry:
+            artista = entry.get("artist", {}).get("name", "").strip().casefold()
+            nombre_album = entry.get("album", {}).get("title", "").strip().casefold()
+            portada_url = (
+                entry.get("album", {}).get("cover_xl")
+                or entry.get("album", {}).get("cover_big")
+                or entry.get("album", {}).get("cover_medium")
+            )
+        else:
+            continue
+
+        if artista == artist_norm and nombre_album == album_norm and portada_url:
+            img = _download_image(portada_url)
+            if img:
+                return img
+
+    logger.warning("[WARN] No se encontró portada para '%s' de '%s' en álbum '%s'", title, artist, album)
+    return None

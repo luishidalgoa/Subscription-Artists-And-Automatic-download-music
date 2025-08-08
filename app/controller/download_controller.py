@@ -32,7 +32,7 @@ def run_descargas():
         since_time = last_run.get(name, now)
         output_path = ROOT_PATH / name
         output_path.mkdir(parents=True, exist_ok=True)
-        output_template = str(output_path / "%(upload_date>%Y-%m-%d)s" / "%(title)s.%(ext)s")
+        output_template = str(output_path / "%(playlist_title)s" / "%(title)s.%(ext)s")
 
         command = [
             "yt-dlp", 

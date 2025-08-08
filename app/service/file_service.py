@@ -1,13 +1,20 @@
 # app/service/file_service.py
 from pathlib import Path
-from app.utils.audio_utils import extraer_album
+from app.utils.audio_utils import extraer_album, obtener_portada_album
 import logging
 logger = logging.getLogger(__name__)
+from mutagen.id3 import ID3, APIC, error
 
 import re
 from typing import Dict
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3NoHeaderError
+
+def obtener_subcarpetas(directorio: Path) -> dict[str, Path]:
+    """
+    Devuelve un diccionario {nombre_carpeta: Path} con las subcarpetas directas.
+    """
+    return {carpeta.name: carpeta for carpeta in directorio.iterdir() if carpeta.is_dir()}
 
 def mover_a_albumes(artista_path: Path) -> Dict[str, Path]:
     subcarpetas = [p for p in artista_path.iterdir() if p.is_dir()]
@@ -35,24 +42,22 @@ def mover_a_albumes(artista_path: Path) -> Dict[str, Path]:
             if not any(carpeta.iterdir()):
                 carpeta.rmdir()
 
-        # Actualizar metadatos de todos los mp3 del álbum
-        #actualizar_metadatos_album(destino)
-
     return rutas_album
 
-def eliminar_previews(artista_path: Path):
-    previews = list(artista_path.glob("**/*(Preview)*.mp3"))
-    for archivo in previews:
-        try:
-            archivo.unlink()
-            carpeta = archivo.parent
-            if not any(carpeta.iterdir()):
-                carpeta.rmdir()
-        except Exception as e:
-            logger.error(f"Error al eliminar {archivo.name}: {e}")
+def eliminar_previews(archivos_mp3: list[Path]):
+    for archivo in archivos_mp3:
+        # Solo actuar si el nombre contiene "(Preview)"
+        if "(Preview)" in archivo.name:
+            try:
+                archivo.unlink()  # Elimina el archivo
+                carpeta = archivo.parent
+                # Si la carpeta queda vacía, la borra
+                if not any(carpeta.iterdir()):
+                    carpeta.rmdir()
+            except Exception as e:
+                logger.error(f"Error al eliminar {archivo.name}: {e}")
 
-def renombrar_con_indice_en(mp3s: Path, artista: str):
-
+def renombrar_con_indice_en(mp3s: list[Path], artista: str):
     for i, archivo in enumerate(mp3s, start=1):
         # Limpiar nombre: quitar si empieza por "##. "
         nombre_limpio = re.sub(r"^\d{2}\. ", "", archivo.name)
@@ -65,7 +70,7 @@ def renombrar_con_indice_en(mp3s: Path, artista: str):
             archivo = nuevo_path  # Actualizar referencia
 
         # Actualizar metadatos
-        actualizar_metadatos_por_defecto(archivo, i,artista)
+        actualizar_metadatos_por_defecto(archivo, i, artista)
 
 
 def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str):
@@ -80,26 +85,50 @@ def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str):
     audio["tracknumber"] = str(numero)
     #interprete del album
     audio["albumartist"] = artista
+    # si la etiqueta album esta vacio la rellena con el nombre del album
+    if not audio.get("album"):
+        audio["album"] = archivo.parent.name
     audio.save(archivo)
     
-"""
-def actualizar_metadatos_album(album_path: Path):
-    mp3s = sorted(album_path.glob("*.mp3"))
+
+def actualizar_portada(mp3s: list[Path], artista: str):
     if not mp3s:
+        logger.info(f"[INFO] No hay mp3s para actualizar portada de {artista}")
         return
 
     primer_mp3 = mp3s[0]
+    album = primer_mp3.parent.name
 
     try:
-        audio = EasyID3(primer_mp3)
-        title = audio.get("title", [""])[0]
-        artist = audio.get("albumartist", [""])[0]
-        portada = obtener_portada_album(title, artist)
+        audio_easy = EasyID3(primer_mp3)
+        title = audio_easy.get("title", [""])[0]
+        artist_tag = audio_easy.get("albumartist", [""])[0] or artista
+
+        portada_bytes = obtener_portada_album(title, artist_tag, album)
+        if not portada_bytes:
+            logger.warning(f"[WARN] No se encontró portada para '{title}' de '{artist_tag}' en álbum '{album}'")
+            return
+
     except Exception as e:
         logger.warning(f"[WARN] No se pudo obtener portada: {e}")
-        portada = None
+        return
 
-    for mp3 in mp3s:
-        datos = consultar_metadatos(mp3)
-        actualizar_metadatos(mp3, datos, portada)
-"""
+    for mp3_file in mp3s:
+        try:
+            audio = ID3(mp3_file)
+        except error:
+            audio = ID3()  # Si no tiene tags previas
+
+        audio.delall("APIC")
+        audio.add(
+            APIC(
+                encoding=3,
+                mime="image/jpeg",
+                type=3,
+                desc="Cover",
+                data=portada_bytes
+            )
+        )
+        audio.save(mp3_file)
+        logger.info(f"[INFO] Portada actualizada en {mp3_file.name}")
+
