@@ -45,7 +45,7 @@ def run_descargas():
             "--retries", "3",
             "--dateafter", since_time[:10].replace('-', ''),
             #"--reject-title", "(?i)\\(preview\\)", 
-            "--break-on-reject",
+            #"--break-on-reject",
             "-o", output_template, url
         ]
 
