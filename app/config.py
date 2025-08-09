@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 
 now = datetime.now(timezone.utc).isoformat()[:19]
 
+def update_now():
+    global now
+    now = datetime.now(timezone.utc).isoformat()[:19]
+
 load_dotenv()
 
 ROOT_PATH = Path(os.getenv("ROOT_PATH", "/music")).resolve()

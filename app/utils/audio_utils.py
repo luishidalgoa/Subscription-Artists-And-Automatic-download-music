@@ -18,7 +18,8 @@ def extraer_album(mp3_path: str) -> str | None:
 
 
 def buscar_resultados_deezer(query: str) -> list[dict]:
-    url = f"https://api.deezer.com/search?q={requests.utils.quote(query)}"
+    query_normalized = normalize_to_ascii(query)
+    url = f"https://api.deezer.com/search?q={requests.utils.quote(query_normalized)}"
     logger.info(f"[INFO] Buscando en Deezer: {url}")
     try:
         resp = requests.get(url, timeout=5)
@@ -76,12 +77,34 @@ def artista_coincide(albumartist_api: str, artist_api: str, albumartist_mp3: str
         return True
     return False
 
+def normalize_to_ascii(s: str) -> str:
+    s = unicodedata.normalize('NFD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    replacements = {
+        '’': "'",
+        '‘': "'",
+        '“': '"',
+        '”': '"',
+        '：': ':',
+        '–': '-',
+        '—': '-',
+        '…': '...',
+        '´': "'",
+        '¨': '"',
+    }
+    for orig, repl in replacements.items():
+        s = s.replace(orig, repl)
+    s = re.sub(r'[^\x00-\x7F]', '', s)  # eliminar no ASCII restantes
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
 def obtener_portada_album(mp3: Path) -> Optional[bytes]:
     tags = extraer_tags(mp3)
-    albumartist = tags['albumartist']
-    artist = tags['artist']
-    title = tags['title']
-    album = tags['album']
+    albumartist = normalize_to_ascii(tags['albumartist'])
+    artist = normalize_to_ascii(tags['artist'])
+    title = normalize_to_ascii(tags['title'])
+    album = normalize_to_ascii(tags['album'])
 
     if not album or not artist:
         logger.warning(f"[WARN] El archivo {mp3} no tiene tags de artista o álbum suficientes")
@@ -92,24 +115,26 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
     title_norm = title.casefold()
     album_norm = album.casefold()
 
+    logger.info(f"[INFO] Buscando portada para: {albumartist} - {album}")
+
     # 1) Búsqueda amplia
     query = f"{albumartist} {title} {album}"
     resultados = buscar_resultados_deezer(query)
 
     for entry in resultados:
         if "album" in entry:
-            artista_api = entry.get("album", {}).get("artist", {}).get("name", "").casefold()
-            cancion_api = entry.get("title", "").casefold()
-            nombre_album_api = entry.get("album", {}).get("title", "").casefold()
+            artista_api = normalize_to_ascii(entry.get("album", {}).get("artist", {}).get("name", "")).casefold()
+            cancion_api = normalize_to_ascii(entry.get("title", "")).casefold()
+            nombre_album_api = normalize_to_ascii(entry.get("album", {}).get("title", "")).casefold()
             portada_url = (
                 entry.get("album", {}).get("cover_xl")
                 or entry.get("album", {}).get("cover_big")
                 or entry.get("album", {}).get("cover_medium")
             )
         else:
-            artista_api = entry.get("artist", {}).get("name", "").casefold()
-            cancion_api = entry.get("title", "").casefold()
-            nombre_album_api = entry.get("title", "").casefold()  # fallback
+            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", "")).casefold()
+            cancion_api = normalize_to_ascii(entry.get("title", "")).casefold()
+            nombre_album_api = normalize_to_ascii(entry.get("title", "")).casefold()  # fallback
             portada_url = (
                 entry.get("cover_xl")
                 or entry.get("cover_big")
@@ -132,19 +157,20 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
 
     for entry in resultados:
         if "cover_xl" in entry or entry.get("type") == "album":
-            artista_api = entry.get("artist", {}).get("name", "")
-            nombre_album_api = entry.get("title", "").casefold()
+            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", "")).casefold()
+            nombre_album_api = normalize_to_ascii(entry.get("title", "")).casefold()
             portada_url = (
                 entry.get("cover_xl")
                 or entry.get("cover_big")
                 or entry.get("cover_medium")
             )
         elif "album" in entry:
-            artista_api = entry.get("artist", {}).get("name", "")
+            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", ""))
             if not artista_api:
-                artista_api = entry.get("album", {}).get("artist", {}).get("name", "")
+                artista_api = normalize_to_ascii(entry.get("album", {}).get("artist", {}).get("name", ""))
+            artista_api = artista_api.casefold()
 
-            nombre_album_api = entry.get("album", {}).get("title", "").casefold()
+            nombre_album_api = normalize_to_ascii(entry.get("album", {}).get("title", "")).casefold()
             portada_url = (
                 entry.get("album", {}).get("cover_xl")
                 or entry.get("album", {}).get("cover_big")
@@ -173,28 +199,29 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
             if img:
                 return img
 
-    # Si no se devolvió portada aún, pero la respuesta no está vacía y algún album coincide
+    # 3) Último intento: comparar sin normalizar (o ya ascii y casefold)
     if resultados:
         for entry in resultados:
             nombre_album_api = ""
             portada_url = None
             if "cover_xl" in entry or entry.get("type") == "album":
-                nombre_album_api = entry.get("title", "").casefold()
+                nombre_album_api = normalize_to_ascii(entry.get("title", "")).casefold()
                 portada_url = (
                     entry.get("cover_xl")
                     or entry.get("cover_big")
                     or entry.get("cover_medium")
                 )
             elif "album" in entry:
-                nombre_album_api = entry.get("album", {}).get("title", "").casefold()
+                nombre_album_api = normalize_to_ascii(entry.get("album", {}).get("title", "")).casefold()
                 portada_url = (
                     entry.get("album", {}).get("cover_xl")
                     or entry.get("album", {}).get("cover_big")
                     or entry.get("album", {}).get("cover_medium")
                 )
-            
+                
             if nombre_album_api == album_norm and portada_url:
                 img = _download_image(portada_url)
                 if img:
                     return img
+
     return None

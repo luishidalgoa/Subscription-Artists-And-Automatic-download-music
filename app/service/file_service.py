@@ -34,7 +34,14 @@ def mover_a_albumes(artista_path: Path) -> Dict[str, Path]:
         rutas_album[album] = destino
 
         if carpeta.name != album:
-            destino.mkdir(exist_ok=True)
+            try:
+                # Esto crea la carpeta destino y todas las carpetas padre si no existen
+                destino.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                # Aquí podrías loguear el error o levantarlo si quieres
+                print(f"Error creando carpeta {destino}: {e}")
+                continue  # Salta al siguiente álbum para no detener todo
+
             for mp3 in mp3s:
                 destino_mp3 = destino / mp3.name
                 if not destino_mp3.exists():
@@ -43,6 +50,7 @@ def mover_a_albumes(artista_path: Path) -> Dict[str, Path]:
                 carpeta.rmdir()
 
     return rutas_album
+
 
 def eliminar_previews(archivos_mp3: list[Path]):
     for archivo in archivos_mp3:
@@ -80,8 +88,6 @@ def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str) -
     except ID3NoHeaderError:
         audio = EasyID3()
 
-    logger.info(f"Archivo de musica: {archivo.name}")
-
     audio["tracknumber"] = str(numero)
     audio["albumartist"] = artista
     if not audio.get("album"):
@@ -103,7 +109,7 @@ def actualizar_portada(mp3s: list[Path], artista: str):
         audio_easy = EasyID3(primer_mp3)
         title = audio_easy.get("title", [""])[0]
         artist_tag = audio_easy.get("albumartist", [""])[0] or artista
-
+    
         portada_bytes = obtener_portada_album(primer_mp3)
         if not portada_bytes:
             logger.warning(f"[WARN] No se encontró portada para '{title}' de '{artist_tag}' en álbum '{album}'")
