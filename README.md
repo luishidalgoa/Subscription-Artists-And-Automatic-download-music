@@ -1,3 +1,28 @@
+# Índice
+
+1. 🎵 Introducción  
+2. 📂 Estructura del Proyecto  
+3. ⚙️ Puesta en Marcha  
+   3.1. Clonar el repositorio  
+   3.2. Crear entorno de configuración  
+   3.3. Variables de entorno (`.env`)  
+4. 🐳 Ejecución con Docker  
+   4.1. Construir y levantar el servicio  
+   4.2. Volúmenes  
+5. 🖥️ Ejecución local (sin Docker)  
+   5.1. Instalar dependencias del sistema  
+   5.2. Instalar dependencias Python  
+   5.3. Instalar yt-dlp  
+   5.4. Ejecutar el servicio  
+6. 🔧 Configuraciones Manuales  
+7. 📦 Funcionalidad Interna  
+   7.1. Descarga  
+   7.2. Postprocesado  
+   7.3. Registro de ejecución  
+8. 🚀 Despliegue  
+9. 📜 Licencia
+
+
 # 🎵 Music Channel Auto Downloader
 
 Sistema automatizado para **suscribirse a canales de música** (YouTube / YouTube Music) y **descargar sus últimos lanzamientos** en formato MP3, con metadatos y portadas actualizadas desde la API de Deezer.
