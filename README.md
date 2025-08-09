@@ -70,6 +70,7 @@ cd yt-music-downloader
 ````
 
 ### 2. Crear entorno de configuración
+#### 2.1 Artists.json
 En la carpeta `config/` crea el archivo `artists.json`:
 ````
 [
@@ -78,6 +79,17 @@ En la carpeta `config/` crea el archivo `artists.json`:
     "channel_url": "https://www.youtube.com/channel/UCLk8IJ1TwI7Xl7UUfAD8xPQ"
   }
 ]
+````
+#### 2.2 last_run.json
+En la carpeta `config/` crea el archivo `last_run.json`:
+> El archivo `last_run.json` describe la ultima vez que se comprobaron cambios en el artista
+
+> ⚠️ La key debe ser el mismo string que el campo "name" del artista en `artists.json`
+
+````
+{
+  ""Myke Towers": "2020-01-09T08:31:22"
+}
 ````
 
 ### 3. Variables de entorno (`.env`)
