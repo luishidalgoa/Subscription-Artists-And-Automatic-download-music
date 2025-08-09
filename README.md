@@ -1,26 +1,27 @@
 # Índice
 
-1. 🎵 Introducción  
-2. 📂 Estructura del Proyecto  
-3. ⚙️ Puesta en Marcha  
-   3.1. Clonar el repositorio  
-   3.2. Crear entorno de configuración  
-   3.3. Variables de entorno (`.env`)  
-4. 🐳 Ejecución con Docker  
-   4.1. Construir y levantar el servicio  
-   4.2. Volúmenes  
-5. 🖥️ Ejecución local (sin Docker)  
-   5.1. Instalar dependencias del sistema  
-   5.2. Instalar dependencias Python  
-   5.3. Instalar yt-dlp  
-   5.4. Ejecutar el servicio  
-6. 🔧 Configuraciones Manuales  
-7. 📦 Funcionalidad Interna  
-   7.1. Descarga  
-   7.2. Postprocesado  
-   7.3. Registro de ejecución  
-8. 🚀 Despliegue  
-9. 📜 Licencia
+1. [🎵 Introducción](#-introducción)  
+2. [📂 Estructura del Proyecto](#-estructura-del-proyecto)  
+3. [⚙️ Puesta en Marcha](#-puesta-en-marcha)  
+   3.1. [Clonar el repositorio](#1-clonar-el-repositorio)  
+   3.2. [Crear entorno de configuración](#2-crear-entorno-de-configuración)  
+   3.3. [Variables de entorno (`.env`)](#3-variables-de-entorno-env)  
+4. [🐳 Ejecución con Docker](#-ejecución-con-docker)  
+   4.1. [Construir y levantar el servicio](#1-construir-y-levantar-el-servicio)  
+   4.2. [Volúmenes](#2-volúmenes)  
+5. [🖥️ Ejecución local (sin Docker)](#️-ejecución-local-sin-docker)  
+   5.1. [Instalar dependencias del sistema](#1-instalar-dependencias-del-sistema)  
+   5.2. [Instalar dependencias Python](#2-instalar-dependencias-python)  
+   5.3. [Instalar yt-dlp](#3-instalar-yt-dlp)  
+   5.4. [Ejecutar el servicio](#4-ejecutar-el-servicio)  
+6. [🔧 Configuraciones Manuales](#-configuraciones-manuales)  
+7. [📦 Funcionalidad Interna](#-funcionalidad-interna)  
+   7.1. [Descarga](#1-descarga)  
+   7.2. [Postprocesado](#2-postprocesado)  
+   7.3. [Registro de ejecución](#3-registro-de-ejecución)  
+8. [🚀 Despliegue](#-despliegue)  
+9. [📜 Licencia](#-licencia)  
+
 
 
 # 🎵 Music Channel Auto Downloader
