@@ -32,5 +32,4 @@ def filtrar_mp3s_por_fecha(mp3s: List[Path], referencia_iso: str, margen_minutos
         mtime = datetime.fromtimestamp(mp3.stat().st_mtime, tz=timezone.utc)
         if abs(referencia_dt - mtime) <= margen:
             filtrados.append(mp3)
-    #return filtrados
-    return mp3s
+    return filtrados
