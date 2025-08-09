@@ -1,2 +1,7 @@
 /output/
 /app/**/__pycache__/
+
+# los json de config
+/config/artists.json
+/config/last_run.json
+
