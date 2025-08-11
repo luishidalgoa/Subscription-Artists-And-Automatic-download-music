@@ -5,6 +5,9 @@
 3. [⚙️ Puesta en Marcha](#-puesta-en-marcha)  
    3.1. [Clonar el repositorio](#1-clonar-el-repositorio)  
    3.2. [Crear entorno de configuración](#2-crear-entorno-de-configuración)  
+      3.2.1. [Artists.json](#21-artistsjson)  
+      3.2.2. [last_run.json](#22-last_runjson)  
+      3.2.3. [Cookies](#23-cookies) 
    3.3. [Variables de entorno (`.env`)](#3-variables-de-entorno-env)  
 4. [🐳 Ejecución con Docker](#-ejecución-con-docker)  
    4.1. [Construir y levantar el servicio](#1-construir-y-levantar-el-servicio)  
@@ -70,8 +73,9 @@ cd yt-music-downloader
 ````
 
 ### 2. Crear entorno de configuración
+
 #### 2.1 Artists.json
-En la carpeta `config/` crea el archivo `artists.json`:
+En la carpeta **config/** crea el archivo **artists.json**:
 ````
 [
   {
@@ -80,17 +84,29 @@ En la carpeta `config/` crea el archivo `artists.json`:
   }
 ]
 ````
-#### 2.2 last_run.json
-En la carpeta `config/` crea el archivo `last_run.json`:
-> El archivo `last_run.json` describe la ultima vez que se comprobaron cambios en el artista
 
-> ⚠️ La key debe ser el mismo string que el campo "name" del artista en `artists.json`
+#### 2.2 last_run.json
+En la carpeta **config/** crea el archivo **last_run.json**:  
+> El archivo **last_run.json** describe la última vez que se comprobaron cambios en el artista.  
+> ⚠️ La key debe ser el mismo string que el campo "name" del artista en **artists.json**  
 
 ````
 {
-  ""Myke Towers": "2020-01-09T08:31:22"
+  "Myke Towers": "2020-01-09T08:31:22"
 }
 ````
+
+#### 2.3 Archivo de cookies
+En la carpeta **config/** encontrarás el archivo de ejemplo **_cookies.example.txt**.  
+Para activar la autenticación y evitar bloqueos de YouTube:  
+1. Exporta tus cookies desde tu navegador.  
+2. Sustituye el contenido de **_cookies.example.txt** por tus cookies reales.  
+3. **Renombra el archivo a _cookies.txt** para que el sistema lo utilice durante las descargas.  
+
+> Para exportar las cookies se recomienda usar extensiones como:   
+> - [Export Cookies](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) para Chrome
+
+> ⚠️ Si no se renombra a **_cookies.txt**, el sistema no aplicará las cookies y podría fallar con contenido restringido.
 
 ### 3. Variables de entorno (`.env`)
 Ejemplo:

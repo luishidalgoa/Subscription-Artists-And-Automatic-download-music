@@ -6,7 +6,7 @@ from app.service.download_service import procesar_albumes
 import os
 import logging
 logger = logging.getLogger(__name__)
-from app.config import now
+from app.config import now,COOKIES_FILE
 
 
 def run_descargas():
@@ -36,6 +36,7 @@ def run_descargas():
 
         command = [
             "yt-dlp", 
+            "--cookies", str(COOKIES_FILE),
             "--quiet", 
             "--extract-audio", 
             "--audio-format", "mp3",
