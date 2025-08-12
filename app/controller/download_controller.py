@@ -43,6 +43,7 @@ def run_descargas():
             "--no-overwrites", 
             "--add-metadata", 
             "--embed-thumbnail",
+            "--sleep-interval", "1",
             "--retries", "3",
             "--dateafter", since_time[:10].replace('-', ''),
             #"--reject-title", "(?i)\\(preview\\)", 

@@ -96,7 +96,9 @@ En la carpeta **config/** crea el archivo **last_run.json**:
 }
 ````
 
-#### 2.3 Archivo de cookies
+#### 2.3 Archivo de cookies (OPCIONAL)
+Si has abusado de descargas de contenido, es posible que Youtube haya bloqueado tu IP por un tiempo, y te pida credenciales de Youtube. En ese caso:
+
 En la carpeta **config/** encontrarás el archivo de ejemplo **_cookies.example.txt**.  
 Para activar la autenticación y evitar bloqueos de YouTube:  
 1. Exporta tus cookies desde tu navegador.  
