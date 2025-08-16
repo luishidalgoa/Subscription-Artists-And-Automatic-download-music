@@ -7,15 +7,15 @@ import os
 import logging
 logger = logging.getLogger(__name__)
 from app.config import now,COOKIES_FILE
+from app.service.console_reader_service import run_yt_dlp
 
 
 def run_descargas():
-
     try:
         with ARTISTS_FILE.open() as f:
             artists = json.load(f)
     except Exception as e:
-        print(f"Error al leer artists.json: {e}")
+        logger.error(f"Error al leer artists.json: {e}")
         return
 
     if LAST_RUN_FILE.exists():
@@ -52,7 +52,12 @@ def run_descargas():
             "-o", output_template, url
         ]
 
-        subprocess.run(command)
+        success = run_yt_dlp(command)
+
+        if not success:
+            logger.warning(f"⏹ Abortado proceso para {name} por error crítico.")
+            return  # 👈 aborta todo el proceso
+
         logger.info(f"  ↳ Descarga completada para {name}.")
         procesar_albumes(output_path)
         last_run[name] = now
