@@ -22,7 +22,6 @@ def run_yt_dlp(command: list[str]) -> bool:
     error_detected = False
     for line in process.stdout:
         line = line.strip()
-        logger.info("hola "+line)
         if line:
             logger.debug(f"[yt-dlp] {line}")
 
