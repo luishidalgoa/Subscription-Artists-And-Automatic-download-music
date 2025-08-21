@@ -36,7 +36,7 @@ def run_descargas():
 
         command = [
             "yt-dlp", 
-            "--verbose",
+            #"--verbose",
             "--cookies", str(COOKIES_FILE),
             "--quiet", 
             "--extract-audio", 
@@ -45,11 +45,10 @@ def run_descargas():
             "--add-metadata", 
             "--embed-thumbnail",
             "--sleep-interval", "5",
-            "--max-sleep-interval","15",
+            "--max-sleep-interval","10",
             "--retries", "3",
             "--dateafter", since_time[:10].replace('-', ''),
-            #"--reject-title", "(?i)\\(preview\\)", 
-            #"--break-on-reject",
+            "--break-on-reject",
             "-o", output_template, url
         ]
 

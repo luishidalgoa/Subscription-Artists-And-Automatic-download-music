@@ -4,7 +4,7 @@ import logging
 from app.scheduler import start_scheduler, reset_scheduler
 from app.controller.download_controller import run_descargas
 from app.utils.logging_config import configurar_logging
-from app.service.yt_dlp import actualizar_yt_dlp
+from app.service.update_service import actualizar_yt_dlp
 
 logger = logging.getLogger(__name__)
 
