@@ -29,15 +29,25 @@ def actualizar_yt_dlp():
 
 def actualizar_servicio():
     try:
-        # Obtiene los cambios remotos sin eliminar locales
+        # Fetch primero
         subprocess.run(["git", "fetch"], check=True)
-        # Aplica los cambios remotos sobre los locales
+
+        # Pull con rebase y autostash
         result = subprocess.run(
-            ["git", "pull", "--rebase", "--autostash"],
+            ["git", "pull", "--rebase", "--autostash", "origin", "main"],
             check=True,
             capture_output=True,
             text=True
         )
-        logger.info(f"Actualización de repositorio:\n{result.stdout}")
+
+        output = result.stdout.strip()
+
+        if "up to date" in output.lower():
+            logger.info("📂 El repositorio ya estaba actualizado.")
+        elif "updating" in output.lower() or "fast-forward" in output.lower():
+            logger.info("⬆️  El repositorio se actualizó con éxito.")
+        else:
+            logger.info(f"ℹ️ Resultado de la actualización:\n{output}")
+
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error al actualizar repositorio: {e.stderr}")
+        logger.error(f"❌ Error al actualizar repositorio:\n{e.stderr}")
