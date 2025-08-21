@@ -2,7 +2,7 @@
 import json
 import subprocess
 from app.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
-from app.service.download_service import procesar_albumes
+from app.service.album_postprocessor import procesar_albumes
 import os
 import logging
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ def run_descargas():
 
         command = [
             "yt-dlp", 
+            "--verbose",
             "--cookies", str(COOKIES_FILE),
             "--quiet", 
             "--extract-audio", 

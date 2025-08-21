@@ -1,6 +1,6 @@
 services:
   yt-music-downloader:
-    container_name: yt_scheduler_artists
+    container_name: yt_subs
     build:
       context: .
       dockerfile: Dockerfile
