@@ -15,7 +15,7 @@ def download_job():
 
 def start_scheduler():
     schedule.every().day.do(update_yt_dlp_job)  # Actualiza yt-dlp cada día
-    schedule.every(SCHEDULE_INTERVAL_DAYS).minutes.do(download_job)  # Descarga cada N días
+    schedule.every(1).minutes.do(download_job)  # Descarga cada N días
 
     while True:
         schedule.run_pending()
