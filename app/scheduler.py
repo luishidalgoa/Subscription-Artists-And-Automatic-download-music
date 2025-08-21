@@ -12,7 +12,6 @@ def download_job():
     update_now()
     run_descargas()
 
-
 def start_scheduler():
     schedule.every().day.do(update_yt_dlp_job)  # Actualiza yt-dlp cada día
     schedule.every(SCHEDULE_INTERVAL_DAYS).days.do(download_job)  # Descarga cada N días
@@ -20,3 +19,10 @@ def start_scheduler():
     while True:
         schedule.run_pending()
         time.sleep(1)
+
+def reset_scheduler():
+    """Limpia los jobs y reprograma el scheduler a partir de ahora"""
+    schedule.clear()
+    schedule.every().day.do(update_yt_dlp_job)
+    schedule.every(SCHEDULE_INTERVAL_DAYS).days.do(download_job)
+    # No arrancamos loop aquí porque se espera que main.py ya lo maneje
