@@ -2,7 +2,7 @@
 import json
 import subprocess
 from app.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
-from app.service.download_service import procesar_albumes
+from app.service.album_postprocessor import procesar_albumes
 import os
 import logging
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ def run_descargas():
 
         command = [
             "yt-dlp", 
+            #"--verbose",
             "--cookies", str(COOKIES_FILE),
             "--quiet", 
             "--extract-audio", 
@@ -44,11 +45,10 @@ def run_descargas():
             "--add-metadata", 
             "--embed-thumbnail",
             "--sleep-interval", "5",
-            "--max-sleep-interval","15",
+            "--max-sleep-interval","10",
             "--retries", "3",
             "--dateafter", since_time[:10].replace('-', ''),
-            #"--reject-title", "(?i)\\(preview\\)", 
-            #"--break-on-reject",
+            "--break-on-reject",
             "-o", output_template, url
         ]
 

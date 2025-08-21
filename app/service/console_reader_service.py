@@ -25,6 +25,12 @@ def run_yt_dlp(command: list[str]) -> bool:
         if line:
             logger.debug(f"[yt-dlp] {line}")
 
+            # Detectar descarga completada
+            if line.startswith("[ExtractAudio] Destination:") or "has already been downloaded" in line:
+                # extraer el nombre del archivo
+                title = line.split("Destination:")[-1].strip() if "Destination:" in line else line
+                logger.info(f"🎵 Descargado: {title}")
+
         # probar cada detector
         for detector in ERROR_DETECTORS:
             if detector(line):  # si detecta error, abortamos

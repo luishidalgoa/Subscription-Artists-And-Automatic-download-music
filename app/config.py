@@ -14,6 +14,7 @@ load_dotenv()
 
 ROOT_PATH = Path(os.getenv("ROOT_PATH", "/music")).resolve()
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "./config")).resolve()
+REPO_PATH = os.getenv("REPO_PATH", "https://github.com/luishidalgoa/Subscription-Artists-And-Automatic-download-music")
 
 ARTISTS_FILE = CONFIG_PATH / "artists.json"
 LAST_RUN_FILE = CONFIG_PATH / "last_run.json"  
