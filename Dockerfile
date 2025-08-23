@@ -24,8 +24,10 @@ RUN yt-dlp -U
 # Copia el código del proyecto
 COPY . .
 
-RUN pip install .
+RUN pip install -e .
+
+ENV YT_COMMAND="boot"
 
 # Comando por defecto (puedes sobreescribirlo)
-CMD ["yt_subs"]
+CMD ["sh", "-c", "yt_subs ${YT_COMMAND}"]
 

@@ -14,8 +14,8 @@ class CLIProvider:
         parser.add_argument(
             "command",
             nargs="?",
-            default="run-now",
-            help="Comando a ejecutar (por defecto: run-now)"
+            default="boot",
+            help="Comando a ejecutar (por defecto: boot)"
         )
         parser.add_argument(
             "--list", "-l",

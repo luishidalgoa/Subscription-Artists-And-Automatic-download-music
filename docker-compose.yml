@@ -1,11 +1,12 @@
 services:
-  yt-music-downloader:
+  yt-subs:
     container_name: yt_subs
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       - TZ=Europe/Madrid
+      - YT_COMMAND=boot
     volumes:
       - ./output:/music
       - ./config:/app/config

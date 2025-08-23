@@ -10,6 +10,8 @@ def download_job():
     update_time_now()
     run_descargas()
 
+
+
 def start_scheduler():
     """Limpia los jobs y reprograma el scheduler a partir de ahora"""
     schedule.clear()

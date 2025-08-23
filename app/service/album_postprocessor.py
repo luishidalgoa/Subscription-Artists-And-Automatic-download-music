@@ -2,14 +2,20 @@
 from app.service.file_service import mover_a_albumes, eliminar_previews, renombrar_con_indice_en, actualizar_portada, obtener_subcarpetas
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional
 import time
 from app.config import now
 from app.providers.logger_provider import LoggerProvider
 
 logger = LoggerProvider()
 
-def procesar_albumes(artista_path: Path):
+
+
+def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
+    options = options or {}
+    options["filter_by_date"] = options.get("filter_by_date", True)
+
+
     mover_a_albumes(artista_path)
 
     time.sleep(2)
@@ -20,9 +26,9 @@ def procesar_albumes(artista_path: Path):
         if not mp3s:
             continue
 
-        mp3s_a_procesar = filtrar_mp3s_por_fecha(mp3s, now, margen_minutos=5)
+        mp3s_a_procesar = filtrar_mp3s_por_fecha(mp3s, now, margen_minutos=5) if options["filter_by_date"] else mp3s
+        logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} mp3s en {ruta}")
         if mp3s_a_procesar:
-
             eliminar_previews(mp3s_a_procesar)
             mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar, artista_path.name)
             actualizar_portada(mp3s_a_procesar, artista_path.name)
@@ -36,17 +42,3 @@ def filtrar_mp3s_por_fecha(mp3s: List[Path], referencia_iso: str, margen_minutos
         if mtime >= limite_inferior:
             filtrados.append(mp3)
     return filtrados
-
-    #temp= []
-    #for mp3 in mp3s:
-    #    from app.utils.audio_utils import extraer_album, normalize_to_ascii
-    #    # extraemos el metadato album
-    #    album = extraer_album(mp3)
-    #        
-    #    if not normalize_to_ascii(album) == normalize_to_ascii("emails i can’t send fwd："):
-    #        logger.warning("No es el album que buscamos")
-    #        return None
-    #    temp.append(mp3)
-    #return temp
-
-    #return mp3s
