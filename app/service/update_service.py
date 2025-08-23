@@ -48,7 +48,7 @@ def _actualizar_servicio():
 
         # Pull con rebase y autostash
         result = subprocess.run(
-            ["git", "pull", "--rebase", "--autostash", "origin", "main"],
+            ["git", "pull", "--rebase", "origin", "main"],
             check=True,
             capture_output=True,
             text=True
