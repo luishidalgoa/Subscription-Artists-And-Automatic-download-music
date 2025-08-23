@@ -1,4 +1,3 @@
-# app/providers/logger_provider.py
 import logging
 from app.utils.logging_config import configurar_logging
 
@@ -7,6 +6,7 @@ class LoggerProvider:
 
     def __new__(cls):
         if cls._instance is None:
-            configurar_logging()
             cls._instance = logging.getLogger("app")
+            if not cls._instance.handlers:
+                configurar_logging()  # solo agrega handlers si no hay
         return cls._instance

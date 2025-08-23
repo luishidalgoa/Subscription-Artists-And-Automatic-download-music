@@ -5,8 +5,9 @@ from datetime import datetime, timezone, timedelta
 from typing import List
 import time
 from app.config import now
-import logging
-logger = logging.getLogger(__name__)
+from app.providers.logger_provider import LoggerProvider
+
+logger = LoggerProvider()
 
 def procesar_albumes(artista_path: Path):
     mover_a_albumes(artista_path)

@@ -1,8 +1,8 @@
 # app/service/console.reader.service.py
 import subprocess
-import logging
+from app.providers.logger_provider import LoggerProvider
 
-logger = logging.getLogger(__name__)
+logger= LoggerProvider()
 
 def run_yt_dlp(command: list[str]) -> bool:
     """

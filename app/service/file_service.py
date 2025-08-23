@@ -1,14 +1,15 @@
 # app/service/file_service.py
 from pathlib import Path
 from app.utils.audio_utils import extraer_album, obtener_portada_album
-import logging
-logger = logging.getLogger(__name__)
 from mutagen.id3 import ID3, APIC, error
 
 import re
 from typing import Dict
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3NoHeaderError
+from app.providers.logger_provider import LoggerProvider
+
+logger = LoggerProvider()
 
 def obtener_subcarpetas(directorio: Path) -> dict[str, Path]:
     """

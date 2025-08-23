@@ -1,13 +1,14 @@
 # app/utils/audio_utils.py
 from mutagen.easyid3 import EasyID3
-import logging
-logger = logging.getLogger(__name__)
 import requests
 from typing import Optional
 import mutagen
 from pathlib import Path
 import re
 import unicodedata
+from app.providers.logger_provider import LoggerProvider
+
+logger = LoggerProvider()
 
 def extraer_album(mp3_path: str) -> str | None:
     try:

@@ -1,11 +1,11 @@
-# utils/logging_config.py
 import logging
-import sys
 
 def configurar_logging():
-    logging.basicConfig(
-        level=logging.INFO,  # Cambia a DEBUG si quieres más detalle
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
-    logging.getLogger("musicbrainzngs").setLevel(logging.WARNING)
+    logger = logging.getLogger("app")
+    if logger.handlers:  # si ya tiene handlers, salir
+        return
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    logger.setLevel(logging.INFO)
