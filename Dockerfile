@@ -24,6 +24,8 @@ RUN yt-dlp -U
 # Copia el código del proyecto
 COPY . .
 
+RUN pip install .
+
 # Comando por defecto (puedes sobreescribirlo)
 CMD ["yt_subs"]
 
