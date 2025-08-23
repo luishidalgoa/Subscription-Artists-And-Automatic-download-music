@@ -1,12 +1,11 @@
 # app/service/yt_dlp.py
 import subprocess
-import logging
-logger = logging.getLogger(__name__)
 
 import subprocess
 import logging
+from app.providers.logger_provider import LoggerProvider
 
-logger = logging.getLogger(__name__)
+logger = LoggerProvider()
 
 def actualizar_app():
     _actualizar_yt_dlp()

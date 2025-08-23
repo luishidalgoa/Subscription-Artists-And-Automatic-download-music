@@ -25,5 +25,5 @@ RUN yt-dlp -U
 COPY . .
 
 # Comando por defecto (puedes sobreescribirlo)
-CMD ["python", "-m", "app.main"]
+CMD ["yt_subs"]
 
