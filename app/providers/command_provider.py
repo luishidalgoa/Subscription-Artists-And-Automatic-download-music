@@ -21,7 +21,6 @@ class CommandProvider:
     def register(self, command: Command):
         """Registra un comando manualmente"""
         self.commands.append(command)
-        logger.info(f"Comando registrado: {command.name}")
 
     def get_command(self, name: str):
         """Busca un comando por nombre"""
