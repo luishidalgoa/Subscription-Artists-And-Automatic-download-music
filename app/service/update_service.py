@@ -11,7 +11,11 @@ from app.config import REPO_PATH
 
 logger = logging.getLogger(__name__)
 
-def actualizar_yt_dlp():
+def actualizar_app():
+    _actualizar_servicio()
+    _actualizar_yt_dlp()
+
+def _actualizar_yt_dlp():
     try:
         resultado = subprocess.run(
             ["yt-dlp", "-U"],
@@ -27,10 +31,20 @@ def actualizar_yt_dlp():
     except subprocess.CalledProcessError as e:
         logger.error(f"Error actualizando yt-dlp: {e}")
 
-def actualizar_servicio():
+import subprocess
+import logging
+import sys
+
+logger = logging.getLogger(__name__)
+
+def _actualizar_servicio():
+    """
+    Actualiza el repositorio de la aplicación.
+    Si hay cambios, termina el proceso para que Docker lo reinicie.
+    """
     try:
         # Fetch primero
-        subprocess.run(["git", "fetch"], check=True)
+        subprocess.run(["git", "fetch"], check=True, capture_output=True, text=True)
 
         # Pull con rebase y autostash
         result = subprocess.run(
@@ -41,13 +55,17 @@ def actualizar_servicio():
         )
 
         output = result.stdout.strip()
+        output_lower = output.lower()
 
-        if "up to date" in output.lower():
+        if "up to date" in output_lower:
             logger.info("📂 El repositorio ya estaba actualizado.")
-        elif "updating" in output.lower() or "fast-forward" in output.lower():
+        elif "updating" in output_lower or "fast-forward" in output_lower:
             logger.info("⬆️  El repositorio se actualizó con éxito.")
+            logger.info("🔄 Terminando aplicación para reinicio automático...")
+            sys.exit(0)
         else:
             logger.info(f"ℹ️ Resultado de la actualización:\n{output}")
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"❌ Error al actualizar repositorio:\n{e.stderr}")
+        stderr = getattr(e, "stderr", "")
+        logger.error(f"❌ Error al actualizar repositorio:\n{stderr}")
