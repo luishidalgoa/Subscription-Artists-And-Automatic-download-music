@@ -9,67 +9,32 @@ logger = LoggerProvider()
 from app.config import now,COOKIES_FILE
 from app.service.console_reader_service import run_yt_dlp
 
-def get_artist_playlists(url: str):
-    """
-    Devuelve todas las playlists de un artista a partir de su URL de canal/releases.
-    """
-    cmd = [
-        "yt-dlp",
-        "--cookies", str(COOKIES_FILE),
-        "-j", "--flat-playlist",
-        url
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    playlists = []
-    for line in result.stdout.splitlines():
-        try:
-            data = json.loads(line)
-            if data.get("_type") == "playlist":
-                playlists.append({
-                    "id": data["id"],
-                    "title": data["title"],
-                    "url": f"https://music.youtube.com/playlist?list={data['id']}"
-                })
-        except json.JSONDecodeError:
-            logger.warning(f"No se pudo parsear línea de yt-dlp: {line}")
-    return playlists
-
-
 def run_descargas():
     try:
-        with ARTISTS_FILE.open() as f:
-            artists = json.load(f)
-    except Exception as e:
-        logger.error(f"Error al leer artists.json: {e}")
-        return
+        try:
+            with ARTISTS_FILE.open() as f:
+                artists = json.load(f)
+        except Exception as e:
+            logger.error(f"Error al leer artists.json: {e}")
+            return
 
-    if LAST_RUN_FILE.exists():
-        with LAST_RUN_FILE.open() as f:
-            last_run = json.load(f)
-    else:
-        last_run = {}
+        if LAST_RUN_FILE.exists():
+            with LAST_RUN_FILE.open() as f:
+                last_run = json.load(f)
+        else:
+            last_run = {}
 
-    for artist in artists:
-        name = artist["name"]
-        url = artist["channel_url"]
-        logger.info(f"▶ Procesando artista: {name}")
+        for artist in artists:
+            name = artist["name"]
+            url = artist["channel_url"]
+            logger.info(f"▶ Procesando artista: {name}")
 
-        since_time = last_run.get(name, now)
-        output_path = ROOT_PATH / name
-        output_path.mkdir(parents=True, exist_ok=True)
+            since_time = last_run.get(name, now)
+            output_path = ROOT_PATH / name
+            output_path.mkdir(parents=True, exist_ok=True)
+            output_template = str(output_path / "%(playlist_title)s" / "%(title)s.%(ext)s")
 
-        # 1. obtener todas las playlists del artista
-        playlists = get_artist_playlists(url)
-        if not playlists:
-            logger.warning(f"⚠ No se encontraron playlists para {name}, saltando.")
-            continue
-
-        # 2. recorrer playlists y descargarlas
-        for pl in playlists:
-            logger.info(f"  🎶 Descargando playlist: {pl['title']}")
-            output_template = str(output_path / pl["title"] / "%(title)s.%(ext)s")
-
-            cmd = [
+            command = [
                 "yt-dlp",
                 "--cookies", str(COOKIES_FILE),
                 "--quiet",
@@ -79,29 +44,31 @@ def run_descargas():
                 "--add-metadata",
                 "--embed-thumbnail",
                 "--sleep-interval", "5",
-                "--max-sleep-interval", "10",
-                "--retries", "3",
+                "--max-sleep-interval","10",
                 "--dateafter", since_time[:10].replace('-', ''),
                 "--break-on-reject",
                 "-o", output_template,
-                pl["url"]
+                url
             ]
 
-            success = run_yt_dlp(cmd)
+            success = run_yt_dlp(command)
 
             if not success:
-                logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {name}.")
-                return  # aborta todo el proceso del script
+                logger.warning(f"⏹ Abortado proceso para {name} por error crítico.")
+                return
 
-        # 3. procesar álbumes del artista al terminar todas sus playlists
-        logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
-        procesar_albumes(output_path)
-        last_run[name] = now
+            logger.info(f"  ↳ Descarga completada para {name}.")
+            procesar_albumes(output_path)
+            last_run[name] = now
 
-    # guardar marcas de última ejecución
-    with LAST_RUN_FILE.open("w") as f:
-        json.dump(last_run, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
+        # guardar marcas de última ejecución
+        with LAST_RUN_FILE.open("w") as f:
+            json.dump(last_run, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
 
-    logger.info("✅ Proceso completado.")
+        logger.info("✅ Proceso completado.")
+
+    except KeyboardInterrupt:
+        logger.warning("⏹ Proceso detenido manualmente por el usuario.")
+        return
