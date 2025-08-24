@@ -9,6 +9,31 @@ logger = LoggerProvider()
 from app.config import now,COOKIES_FILE
 from app.service.console_reader_service import run_yt_dlp
 
+def get_artist_playlists(url: str):
+    """
+    Devuelve todas las playlists de un artista a partir de su URL de canal/releases.
+    """
+    cmd = [
+        "yt-dlp",
+        "--cookies", str(COOKIES_FILE),
+        "-j", "--flat-playlist",
+        url
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    playlists = []
+    for line in result.stdout.splitlines():
+        try:
+            data = json.loads(line)
+            if data.get("_type") == "playlist":
+                playlists.append({
+                    "id": data["id"],
+                    "title": data["title"],
+                    "url": f"https://music.youtube.com/playlist?list={data['id']}"
+                })
+        except json.JSONDecodeError:
+            logger.warning(f"No se pudo parsear línea de yt-dlp: {line}")
+    return playlists
+
 
 def run_descargas():
     try:
@@ -32,36 +57,48 @@ def run_descargas():
         since_time = last_run.get(name, now)
         output_path = ROOT_PATH / name
         output_path.mkdir(parents=True, exist_ok=True)
-        output_template = str(output_path / "%(playlist_title)s" / "%(title)s.%(ext)s")
 
-        command = [
-            "yt-dlp", 
-            #"--verbose",
-            "--cookies", str(COOKIES_FILE),
-            "--quiet", 
-            "--extract-audio", 
-            "--audio-format", "mp3",
-            "--no-overwrites", 
-            "--add-metadata", 
-            "--embed-thumbnail",
-            "--sleep-interval", "5",
-            "--max-sleep-interval","10",
-            "--retries", "3",
-            "--dateafter", since_time[:10].replace('-', ''),
-            "--break-on-reject",
-            "-o", output_template, url
-        ]
+        # 1. obtener todas las playlists del artista
+        playlists = get_artist_playlists(url)
+        if not playlists:
+            logger.warning(f"⚠ No se encontraron playlists para {name}, saltando.")
+            continue
 
-        success = run_yt_dlp(command)
+        # 2. recorrer playlists y descargarlas
+        for pl in playlists:
+            logger.info(f"  🎶 Descargando playlist: {pl['title']}")
+            output_template = str(output_path / pl["title"] / "%(title)s.%(ext)s")
 
-        if not success:
-            logger.warning(f"⏹ Abortado proceso para {name} por error crítico.")
-            return  # 👈 aborta todo el proceso
+            cmd = [
+                "yt-dlp",
+                "--cookies", str(COOKIES_FILE),
+                "--quiet",
+                "--extract-audio",
+                "--audio-format", "mp3",
+                "--no-overwrites",
+                "--add-metadata",
+                "--embed-thumbnail",
+                "--sleep-interval", "5",
+                "--max-sleep-interval", "10",
+                "--retries", "3",
+                "--dateafter", since_time[:10].replace('-', ''),
+                "--break-on-reject",
+                "-o", output_template,
+                pl["url"]
+            ]
 
-        logger.info(f"  ↳ Descarga completada para {name}.")
+            success = run_yt_dlp(cmd)
+
+            if not success:
+                logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {name}.")
+                return  # aborta todo el proceso del script
+
+        # 3. procesar álbumes del artista al terminar todas sus playlists
+        logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
         procesar_albumes(output_path)
         last_run[name] = now
 
+    # guardar marcas de última ejecución
     with LAST_RUN_FILE.open("w") as f:
         json.dump(last_run, f, indent=2)
         f.flush()
