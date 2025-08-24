@@ -20,7 +20,7 @@ def extraer_album(mp3_path: str) -> str | None:
 
 def buscar_resultados_deezer(query: str) -> list[dict]:
     query_normalized = normalize_to_ascii(query)
-    url = f"https://api.deezer.com/search?q={requests.utils.quote(query_normalized)}"
+    url = f"https://api.deezer.com/search/album?q={requests.utils.quote(query_normalized)}"
     logger.info(f"[INFO] Buscando en Deezer: {url}")
     try:
         resp = requests.get(url, timeout=5)
@@ -106,6 +106,7 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
     artist = normalize_to_ascii(tags['artist'])
     title = normalize_to_ascii(tags['title'])
     album = normalize_to_ascii(tags['album'])
+    logger.error(f"[DEBUG] Tags extraídos: albumartist='{albumartist}', artist='{artist}', title='{title}', album='{album}'")
 
     if not album or not artist:
         logger.warning(f"[WARN] El archivo {mp3} no tiene tags de artista o álbum suficientes")
@@ -119,13 +120,24 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
     logger.info(f"[INFO] Buscando portada para: {albumartist} - {album}")
 
     # 1) Búsqueda amplia
-    query = f"{albumartist} {title} {album}"
+    query = f'?q=artist:"{albumartist}" album:"{album}"'
     resultados = buscar_resultados_deezer(query)
 
     for entry in resultados:
-        if "album" in entry:
-            artista_api = normalize_to_ascii(entry.get("album", {}).get("artist", {}).get("name", "")).casefold()
-            cancion_api = normalize_to_ascii(entry.get("title", "")).casefold()
+        if "cover_xl" in entry or entry.get("type") == "album":
+            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", "")).casefold()
+            nombre_album_api = normalize_to_ascii(entry.get("title", "")).casefold()
+            portada_url = (
+                entry.get("cover_xl")
+                or entry.get("cover_big")
+                or entry.get("cover_medium")
+            )
+        elif "album" in entry:
+            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", ""))
+            if not artista_api:
+                artista_api = normalize_to_ascii(entry.get("album", {}).get("artist", {}).get("name", ""))
+            artista_api = artista_api.casefold()
+
             nombre_album_api = normalize_to_ascii(entry.get("album", {}).get("title", "")).casefold()
             portada_url = (
                 entry.get("album", {}).get("cover_xl")
@@ -133,27 +145,30 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
                 or entry.get("album", {}).get("cover_medium")
             )
         else:
-            artista_api = normalize_to_ascii(entry.get("artist", {}).get("name", "")).casefold()
-            cancion_api = normalize_to_ascii(entry.get("title", "")).casefold()
-            nombre_album_api = normalize_to_ascii(entry.get("title", "")).casefold()  # fallback
-            portada_url = (
-                entry.get("cover_xl")
-                or entry.get("cover_big")
-                or entry.get("cover_medium")
-            )
+            continue
 
-        if (
-            artista_api == artist_norm
-            and cancion_api == title_norm
-            and nombre_album_api == album_norm
-            and portada_url
-        ):
+        def normalize_str(s: str) -> str:
+            s = s.casefold()
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            s = re.sub(r'\s+', ' ', s).strip()
+            return s
+
+        nombre_album_api_norm = normalize_str(nombre_album_api)
+        album_norm_norm = normalize_str(album_norm)
+
+        if artista_coincide(
+                albumartist_api=artista_api,
+                artist_api=artista_api,
+                albumartist_mp3=albumartist_norm,
+                artist_mp3=artist_norm
+            ) and re.search(re.escape(album_norm_norm), nombre_album_api_norm) and portada_url:
             img = _download_image(portada_url)
             if img:
                 return img
 
     # 2) Búsqueda estricta con validación flexible de artista
-    query = f'artist:"{albumartist}" album:"{album}"'
+    query = f'album?q=artist:"{albumartist}" album:"{album}"'
     resultados = buscar_resultados_deezer(query)
 
     for entry in resultados:
