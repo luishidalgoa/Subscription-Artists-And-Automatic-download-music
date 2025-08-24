@@ -8,6 +8,44 @@ from app.providers.logger_provider import LoggerProvider
 logger = LoggerProvider()
 from app.config import now,COOKIES_FILE
 from app.service.console_reader_service import run_yt_dlp
+from app.service.file_service import obtener_subcarpetas
+from pathlib import Path
+
+def get_artist_playlists(url: str, artist_root: Path):
+    """
+    Devuelve solo las playlists cuyo título que no coincide con alguna subcarpeta
+    existente dentro del root del artista.
+    """
+    # 1️⃣ Obtener subcarpetas existentes
+    subfolders = obtener_subcarpetas(artist_root)  # {nombre_carpeta: Path}
+
+    # 2️⃣ Ejecutar yt-dlp para listar todas las playlists
+    cmd = [
+        "yt-dlp",
+        "--cookies", str(COOKIES_FILE),
+        "-j", "--flat-playlist",
+        url
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    playlists = []
+
+    for line in result.stdout.splitlines():
+        try:
+            data = json.loads(line)
+            if data.get("url") and "playlist" in data.get("url", ""):
+                title = data.get("title", f"Playlist_{data['id']}")
+                # 3️⃣ Filtrar solo playlists que coinciden con subcarpetas
+                if title not in subfolders:
+                    playlists.append({
+                        "id": data["id"],
+                        "title": title,
+                        "url": data["url"]
+                    })
+        except json.JSONDecodeError:
+            logger.warning(f"No se pudo parsear línea de yt-dlp: {line}")
+
+    return playlists
+
 
 def run_descargas():
     try:
@@ -32,32 +70,43 @@ def run_descargas():
             since_time = last_run.get(name, now)
             output_path = ROOT_PATH / name
             output_path.mkdir(parents=True, exist_ok=True)
-            output_template = str(output_path / "%(playlist_title)s" / "%(title)s.%(ext)s")
 
-            command = [
-                "yt-dlp",
-                "--cookies", str(COOKIES_FILE),
-                "--quiet",
-                "--extract-audio",
-                "--audio-format", "mp3",
-                "--no-overwrites",
-                "--add-metadata",
-                "--embed-thumbnail",
-                "--sleep-interval", "5",
-                "--max-sleep-interval","10",
-                "--dateafter", since_time[:10].replace('-', ''),
-                "--break-on-reject",
-                "-o", output_template,
-                url
-            ]
+            # 1. obtener todas las playlists del artista
+            playlists = get_artist_playlists(url, output_path)
+            if not playlists:
+                logger.warning(f"⚠ No se encontraron playlists para {name}, saltando.")
+                continue
 
-            success = run_yt_dlp(command)
+            # 2. recorrer playlists y descargarlas
+            for pl in playlists:
+                logger.info(f"📁 Examinando playlist: {pl['title']}")
+                output_template = str(output_path / pl["title"] / "%(title)s.%(ext)s")
 
-            if not success:
-                logger.warning(f"⏹ Abortado proceso para {name} por error crítico.")
-                return
+                cmd = [
+                    "yt-dlp",
+                    "--cookies", str(COOKIES_FILE),
+                    "--quiet",
+                    "--extract-audio",
+                    "--audio-format", "mp3",
+                    "--no-overwrites",
+                    "--add-metadata",
+                    "--embed-thumbnail",
+                    "--sleep-interval", "5",
+                    "--max-sleep-interval", "10",
+                    "--dateafter", since_time[:10].replace('-', ''),
+                    "--break-on-reject",
+                    "-o", output_template,
+                    pl["url"]
+                ]
 
-            logger.info(f"  ↳ Descarga completada para {name}.")
+                success = run_yt_dlp(cmd)
+
+                if not success:
+                    logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {name}.")
+                    return  # aborta todo el proceso del script
+
+            # 3. procesar álbumes del artista al terminar todas sus playlists
+            logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
             procesar_albumes(output_path)
             last_run[name] = now
 
@@ -70,5 +119,5 @@ def run_descargas():
         logger.info("✅ Proceso completado.")
 
     except KeyboardInterrupt:
-        logger.warning("⏹ Proceso detenido manualmente por el usuario.")
-        return
+        # Aquí capturamos Ctrl+C y mostramos un mensaje personalizado
+        logger.error("❌ Descarga interrumpida manualmente por el usuario. Todos los procesos activos se detuvieron.")
