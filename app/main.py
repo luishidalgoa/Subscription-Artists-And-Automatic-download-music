@@ -1,4 +1,4 @@
-from app.providers.app_provider import AppProvider
+from app.application.providers.app_provider import AppProvider
 
 def main():
     app = AppProvider()

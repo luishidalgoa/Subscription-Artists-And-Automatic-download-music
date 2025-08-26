@@ -1,5 +1,5 @@
 # app/main.py
-from app.scheduler import start_scheduler
+from app.application.scheduler import start_scheduler
 
 if __name__ == "__main__":
     print("🕒 Servicio activo. Esperando tareas...")

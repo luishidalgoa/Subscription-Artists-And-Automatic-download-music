@@ -1,7 +1,8 @@
 # app/providers/cli_provider.py
 import argparse
-from app.providers.logger_provider import LoggerProvider
-from app.providers.command_provider import CommandProvider
+import sys
+from app.application.providers.logger_provider import LoggerProvider
+from app.application.providers.command_provider import CommandProvider
 
 logger = LoggerProvider()
 
@@ -23,7 +24,8 @@ class CLIProvider:
             help="Muestra todos los comandos disponibles"
         )
 
-        args = parser.parse_args()
+        # Parseamos solo los argumentos principales
+        args, unknown_args = parser.parse_known_args()  # unknown_args captura los parámetros del comando
 
         if args.list:
             self.list_commands()
@@ -32,7 +34,12 @@ class CLIProvider:
         command = self.command_provider.get_command(args.command)
         if command:
             logger.info(f"Ejecutando comando: {command.name}")
-            command.action()
+            try:
+                # Pasamos los parámetros restantes al comando
+                command.action(unknown_args)
+            except SystemExit:
+                # argparse dentro del comando podría llamar a sys.exit, lo capturamos
+                pass
         else:
             logger.error(f"Comando no encontrado: {args.command}")
             self.list_commands()
@@ -42,10 +49,8 @@ class CLIProvider:
         Muestra todos los comandos disponibles en formato tabulado,
         limpio, sin logs de registro repetidos.
         """
-        # Cabecera opcional
         print("\nAvailable commands:\n")
         
-        # Calculamos ancho de la columna del nombre
         max_name_len = max((len(cmd.name) for cmd in self.command_provider.commands), default=0)
         
         for cmd in self.command_provider.commands:
@@ -53,4 +58,5 @@ class CLIProvider:
             description = getattr(cmd, "description", "Sin descripción")
             print(f"{name_col} {description}")
         
-        print("\nUse 'python -m app.main <command>' to execute a command.\n")
+        print("\nUse 'python -m app.main <command> [params]' to execute a command.\n")
+

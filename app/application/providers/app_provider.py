@@ -1,7 +1,7 @@
 # app/providers/app_provider.py
-from app.providers.logger_provider import LoggerProvider
-from app.providers.command_provider import CommandProvider
-from app.providers.cli_provider import CLIProvider
+from app.application.providers.logger_provider import LoggerProvider
+from app.application.providers.command_provider import CommandProvider
+from app.application.providers.cli_provider import CLIProvider
 
 
 class AppProvider:

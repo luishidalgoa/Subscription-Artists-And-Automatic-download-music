@@ -1,11 +1,11 @@
 # app/service/download_service.py
-from app.service.file_service import mover_a_albumes, eliminar_previews, renombrar_con_indice_en, actualizar_portada, obtener_subcarpetas
+from app.infrastructure.service.file_service import mover_a_albumes, eliminar_previews, renombrar_con_indice_en, actualizar_portada, obtener_subcarpetas
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import time
 from app.config import now
-from app.providers.logger_provider import LoggerProvider
+from app.application.providers.logger_provider import LoggerProvider
 
 logger = LoggerProvider()
 

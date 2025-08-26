@@ -1,6 +1,6 @@
 # app/service/console.reader.service.py
 import subprocess
-from app.providers.logger_provider import LoggerProvider
+from app.application.providers.logger_provider import LoggerProvider
 
 logger= LoggerProvider()
 

@@ -2,13 +2,13 @@
 import json
 import subprocess
 from app.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
-from app.service.album_postprocessor import procesar_albumes
+from app.infrastructure.service.album_postprocessor import procesar_albumes
 import os
-from app.providers.logger_provider import LoggerProvider
+from app.application.providers.logger_provider import LoggerProvider
 logger = LoggerProvider()
 from app.config import now,COOKIES_FILE
-from app.service.console_reader_service import run_yt_dlp
-from app.service.file_service import obtener_subcarpetas
+from app.infrastructure.service.console_reader_service import run_yt_dlp
+from app.infrastructure.service.file_service import obtener_subcarpetas
 from pathlib import Path
 
 def get_artist_playlists(url: str, artist_root: Path):

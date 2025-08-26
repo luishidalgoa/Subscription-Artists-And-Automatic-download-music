@@ -2,8 +2,8 @@
 from typing import Callable
 import importlib
 import pkgutil
-import app.commands as commands_pkg
-from app.providers.logger_provider import LoggerProvider
+import app.presentation.commands as commands_pkg
+from app.application.providers.logger_provider import LoggerProvider
 
 logger = LoggerProvider()
 
@@ -30,10 +30,10 @@ class CommandProvider:
         return None
 
     def cargar_comandos(self):
-        """Carga automáticamente todos los módulos en app/commands que tengan función ejecutar"""
+        """Carga automáticamente todos los módulos en app.presentation.commands que tengan función 'ejecutar'"""
         for _, module_name, _ in pkgutil.iter_modules(commands_pkg.__path__):
             try:
-                module = importlib.import_module(f"app.commands.{module_name}")
+                module = importlib.import_module(f"app.presentation.commands.{module_name}")
                 if hasattr(module, "ejecutar"):
                     description = getattr(module, "DESCRIPCION", "Sin descripción")
                     cmd_name = module_name.replace("_", "-")

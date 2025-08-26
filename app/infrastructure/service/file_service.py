@@ -7,7 +7,7 @@ import re
 from typing import Dict
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3NoHeaderError
-from app.providers.logger_provider import LoggerProvider
+from app.application.providers.logger_provider import LoggerProvider
 
 logger = LoggerProvider()
 

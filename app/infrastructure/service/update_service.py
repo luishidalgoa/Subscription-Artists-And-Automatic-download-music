@@ -3,11 +3,12 @@ import subprocess
 
 import subprocess
 import logging
-from app.providers.logger_provider import LoggerProvider
+from app.application.providers.logger_provider import LoggerProvider
 
 logger = LoggerProvider()
 
 def actualizar_app():
+    logger.info("🔄 Actualizando la aplicación...")
     _actualizar_yt_dlp()
 
 def _actualizar_yt_dlp():
