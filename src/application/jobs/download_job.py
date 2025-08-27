@@ -8,7 +8,7 @@ from src.application.providers.logger_provider import LoggerProvider
 logger = LoggerProvider()
 class DownloadJob(BaseJob):
     def __init__(self):
-        super().__init__(name="DownloadJob", time_unit=TimeUnit.MINUTES, interval=3,id=None)
+        super().__init__(name="DownloadJob", time_unit=TimeUnit.DAYS, interval=5,id=None)
 
     def run(self):
         actualizar_app()
