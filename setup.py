@@ -12,7 +12,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "yt_subs=app.main:main"
+            "yt_subs=src.main:main"
         ]
     },
 )

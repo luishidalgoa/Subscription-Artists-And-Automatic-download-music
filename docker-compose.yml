@@ -9,6 +9,7 @@ services:
       - YT_COMMAND=boot
     volumes:
       - ./output:/music
-      - ./config:/app/config
-      - ./app:/app/app
+      - ./config:/Workspace/config
+      - ./data:/Workspace/data
+      - ./src:/Workspace/src
     restart: unless-stopped
