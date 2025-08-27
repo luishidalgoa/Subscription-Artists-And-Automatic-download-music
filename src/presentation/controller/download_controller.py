@@ -34,7 +34,8 @@ def get_artist_playlists(url: str, artist_root: Path):
         try:
             data = json.loads(line)
             if data.get("url") and "playlist" in data.get("url", ""):
-                title = data.get("title", f"Playlist_{data['id']}")
+                raw_title = data.get("title", f"Playlist_{data['id']}")
+                title = sanitize_path_component(raw_title)
                 # 3️⃣ Filtrar solo playlists que coinciden con subcarpetas
                 if title not in subfolders:
                     playlists.append({
