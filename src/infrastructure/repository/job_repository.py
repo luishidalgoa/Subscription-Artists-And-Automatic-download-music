@@ -20,7 +20,8 @@ class JobRepository:
                 id TEXT PRIMARY KEY,
                 name TEXT,
                 next_run_time TEXT,
-                last_run_time TEXT
+                last_run_time TEXT,
+                is_resumed INTEGER DEFAULT 0
             )
         """)
         self.conn.commit()
@@ -33,21 +34,23 @@ class JobRepository:
         `last_run_time`. Si no existe, lo crea.
         """
         self.conn.execute("""
-            INSERT INTO jobs (id, name, next_run_time, last_run_time)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO jobs (id, name, next_run_time, last_run_time, is_resumed)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               next_run_time=excluded.next_run_time,
-              last_run_time=excluded.last_run_time
+              last_run_time=excluded.last_run_time,
+              is_resumed=excluded.is_resumed
         """, (
             job.id,
             job.name,
             job.next_run_time.isoformat() if job.next_run_time else None,
             job.last_run_time.isoformat() if job.last_run_time else None,
+            job.is_resumed
         ))
         self.conn.commit()
 
     def get_jobs(self) -> list[Job]:
-        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time FROM jobs")
+        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time, is_resumed FROM jobs")
         rows = cur.fetchall()
         return [
             Job(
@@ -55,12 +58,13 @@ class JobRepository:
                 name=row[1],
                 next_run_time=datetime.fromisoformat(row[2]) if row[2] else None,
                 last_run_time=datetime.fromisoformat(row[3]) if row[3] else None,
+                is_resumed=bool(row[4])
             )
             for row in rows
         ]
 
     def get_job_by_name(self, name: str) -> Optional[Job]:
-        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time FROM jobs WHERE name = ?", (name,))
+        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time, is_resumed FROM jobs WHERE name = ?", (name,))
         row = cur.fetchone()
         if row:
             return Job(
@@ -68,10 +72,11 @@ class JobRepository:
                 name=row[1],
                 next_run_time=datetime.fromisoformat(row[2]) if row[2] else None,
                 last_run_time=datetime.fromisoformat(row[3]) if row[3] else None,
+                is_resumed=bool(row[4])
             )
         return None
     def get_job_by_id(self, id: str) -> Optional[Job]:
-        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time FROM jobs WHERE id = ?", (id,))
+        cur = self.conn.execute("SELECT id, name, next_run_time, last_run_time, is_resumed FROM jobs WHERE id = ?", (id,))
         row = cur.fetchone()
         if row:
             return Job(
@@ -79,6 +84,7 @@ class JobRepository:
                 name=row[1],
                 next_run_time=datetime.fromisoformat(row[2]) if row[2] else None,
                 last_run_time=datetime.fromisoformat(row[3]) if row[3] else None,
+                is_resumed=bool(row[4])
             )
         return None
 

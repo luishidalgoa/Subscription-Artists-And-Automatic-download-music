@@ -9,3 +9,4 @@ class Job:
     name: str
     next_run_time: Optional[datetime]
     last_run_time: Optional[datetime]
+    is_resumed: bool = False
