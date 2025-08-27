@@ -5,6 +5,7 @@ from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_P
 from src.infrastructure.service.album_postprocessor import procesar_albumes
 import os
 from src.application.providers.logger_provider import LoggerProvider
+from src.utils.strings_formatter import sanitize_path_component
 logger = LoggerProvider()
 from src.infrastructure.config.config import now,COOKIES_FILE
 from src.infrastructure.service.console_reader_service import run_yt_dlp
@@ -63,25 +64,26 @@ def run_descargas():
             last_run = {}
 
         for artist in artists:
-            name = artist["name"]
+            safe_name = sanitize_path_component(artist["name"])
             url = artist["channel_url"]
-            logger.info(f"▶ Procesando artista: {name}")
+            logger.info(f"▶ Procesando artista: {artist['name']}")
 
-            since_time = last_run.get(name, now)
-            output_path = ROOT_PATH / name
+            since_time = last_run.get(artist["name"], now)
+            output_path = ROOT_PATH / safe_name
             output_path.mkdir(parents=True, exist_ok=True)
 
             # 1. obtener todas las playlists del artista
             playlists = get_artist_playlists(url, output_path)
             if not playlists:
-                logger.warning(f"⚠ No se encontraron playlists para {name}, saltando.")
+                logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
                 continue
 
             # 2. recorrer playlists y descargarlas
             for pl in playlists:
+                safe_title = sanitize_path_component(pl["title"])
                 logger.info(f"📁 Examinando playlist: {pl['title']}")
-                (output_path / pl["title"]).mkdir(parents=True, exist_ok=True)
-                output_template = str(output_path / pl["title"] / "%(title)s.%(ext)s")
+                (output_path / safe_title).mkdir(parents=True, exist_ok=True)
+                output_template = str(output_path / safe_title / "%(title)s.%(ext)s")
 
                 cmd = [
                     "yt-dlp",
@@ -103,13 +105,13 @@ def run_descargas():
                 success = run_yt_dlp(cmd)
 
                 if not success:
-                    logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {name}.")
+                    logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {artist['name']}.")
                     return  # aborta todo el proceso del script
 
             # 3. procesar álbumes del artista al terminar todas sus playlists
-            logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
+            logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
             procesar_albumes(output_path)
-            last_run[name] = now
+            last_run[artist["name"]] = now
 
         # guardar marcas de última ejecución
         with LAST_RUN_FILE.open("w") as f:
