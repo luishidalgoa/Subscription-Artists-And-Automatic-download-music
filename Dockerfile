@@ -13,7 +13,7 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
     && chmod a+rx /usr/local/bin/yt-dlp
 
 # Crea directorio de trabajo
-WORKDIR /app
+WORKDIR /Workspace
 
 # Copia requirements e instala dependencias Python
 COPY requirements.txt .
