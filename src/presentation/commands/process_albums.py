@@ -11,9 +11,21 @@ DESCRIPCION = "Procesa todos los albumes o singles descargados de los artistas d
 
 class ProcessAlbumsCommand(BaseCommand):
     DESCRIPCION = DESCRIPCION
-    ARGUMENTOS = {}  # Sin parámetros
+    ARGUMENTOS = {
+        "--artist": {
+            "params": {
+                "required": False,
+                "help": "Nombre del artista a procesar (opcional)"
+            }
+        }
+    }
 
     def handle(self, parsed_args):
+        """
+        Procesa los álbumes de artistas, con filtro opcional por nombre.
+        """
+        artist = getattr(parsed_args, "artist", None)
+
         try:
             with ARTISTS_FILE.open() as f:
                 artists = json.load(f)
@@ -21,8 +33,12 @@ class ProcessAlbumsCommand(BaseCommand):
             logger.error(f"Error al leer artists.json: {e}")
             return
 
-        for artist in artists:
-            name = artist["name"]
+        for artist_data in artists:
+            name = artist_data["name"]
+
+            # Si se especifica un artista, solo procesar ese
+            if artist and name != artist:
+                continue
+
             output_path = ROOT_PATH / name
             procesar_albumes(output_path, {"filter_by_date": False})
-
