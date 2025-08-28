@@ -106,7 +106,6 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
     artist = normalize_to_ascii(tags['artist'])
     title = normalize_to_ascii(tags['title'])
     album = normalize_to_ascii(tags['album'])
-    logger.error(f"[DEBUG] Tags extraídos: albumartist='{albumartist}', artist='{artist}', title='{title}', album='{album}'")
 
     if not album or not artist:
         logger.warning(f"[WARN] El archivo {mp3} no tiene tags de artista o álbum suficientes")
