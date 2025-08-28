@@ -25,6 +25,10 @@ class ProcessAlbumsCommand(BaseCommand):
         Procesa los álbumes de artistas, con filtro opcional por nombre.
         """
         artist = getattr(parsed_args, "artist", None)
+        if artist:
+            # Eliminar comillas simples o dobles al inicio y final
+            artist = artist.strip("'\"")
+
 
         try:
             with ARTISTS_FILE.open() as f:
