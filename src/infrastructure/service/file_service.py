@@ -91,6 +91,7 @@ def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str) -
 
     audio["tracknumber"] = str(numero)
     audio["albumartist"] = artista
+    audio["artist"] = artista
     if not audio.get("album"):
         audio["album"] = archivo.parent.name
     audio.save(archivo)
