@@ -77,7 +77,6 @@ def run_descargas():
             playlists = get_artist_playlists(url, output_path)
             if not playlists:
                 logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
-                continue
 
             # 2. recorrer playlists y descargarlas
             for pl in playlists:
