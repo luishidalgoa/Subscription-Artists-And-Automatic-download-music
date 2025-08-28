@@ -75,8 +75,6 @@ def run_descargas():
 
             # 1. obtener todas las playlists del artista
             playlists = get_artist_playlists(url, output_path)
-            if not playlists:
-                logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
 
             # 2. recorrer playlists y descargarlas
             for pl in playlists:
@@ -109,8 +107,12 @@ def run_descargas():
                     return  # aborta todo el proceso del script
 
             # 3. procesar álbumes del artista al terminar todas sus playlists
-            logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
-            procesar_albumes(output_path)
+            if playlists:
+                logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
+                procesar_albumes(output_path)
+            else:
+                logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
+                
             last_run[artist["name"]] = now
 
         # guardar marcas de última ejecución
