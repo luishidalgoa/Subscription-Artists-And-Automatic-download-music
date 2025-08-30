@@ -1,0 +1,1 @@
+file_music_extension = [".mp3", ".flac", ".m4a", ".wav", ".aac", ".ogg"]

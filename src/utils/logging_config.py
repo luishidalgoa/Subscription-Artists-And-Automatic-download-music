@@ -1,5 +1,7 @@
 import logging
 
+from src.infrastructure.config.config import LOGGER_LEVEL
+
 def configurar_logging():
     logger = logging.getLogger("app")
     if logger.handlers:  # si ya tiene handlers, salir
@@ -8,4 +10,4 @@ def configurar_logging():
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(LOGGER_LEVEL)
