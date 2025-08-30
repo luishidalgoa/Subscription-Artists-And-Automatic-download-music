@@ -2,13 +2,14 @@
 import json
 import subprocess
 from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
+from src.infrastructure.filesystem.json_loader import artists_load, last_run_load
 from src.infrastructure.service.album_postprocessor import procesar_albumes
 import os
 from src.application.providers.logger_provider import LoggerProvider
 from src.utils.strings_formatter import sanitize_path_component
 logger = LoggerProvider()
 from src.infrastructure.config.config import now,COOKIES_FILE
-from src.infrastructure.service.console_reader_service import run_yt_dlp
+from src.infrastructure.service.yt_dlp_service import run_yt_dlp
 from src.infrastructure.filesystem.directory_utils import obtener_subcarpetas
 from pathlib import Path
 
@@ -51,18 +52,8 @@ def get_artist_playlists(url: str, artist_root: Path):
 
 def run_descargas():
     try:
-        try:
-            with ARTISTS_FILE.open() as f:
-                artists = json.load(f)
-        except Exception as e:
-            logger.error(f"Error al leer artists.json: {e}")
-            return
-
-        if LAST_RUN_FILE.exists():
-            with LAST_RUN_FILE.open() as f:
-                last_run = json.load(f)
-        else:
-            last_run = {}
+        artists = artists_load()
+        last_run = last_run_load()
 
         for artist in artists:
             safe_name = sanitize_path_component(artist["name"])

@@ -1,4 +1,5 @@
 # app/infrastructure/config/config.py
+import logging
 import os
 from pathlib import Path
 from datetime import datetime, timezone
@@ -25,7 +26,14 @@ CONFIG_PATH = Path(os.getenv("CONFIG_PATH", CONFIG_DIR)).resolve()
 # Archivos de configuración persistente
 ARTISTS_FILE = CONFIG_PATH / "artists.json"
 LAST_RUN_FILE = CONFIG_PATH / "last_run.json"
+METADATA_SONGS_CACHE = CONFIG_PATH / "metadata_songs_cache.json"
 COOKIES_FILE = Path(os.getenv("COOKIES_FILE", CONFIG_PATH / "_cookies.txt")).resolve()
 
 # Base de datos
 DB_PATH = Path(os.getenv("DB_PATH", "data/db.sqlite")).resolve()
+
+def get_log_level(default: str = "INFO") -> int:
+    level_str = os.getenv("LOGGER_LEVEL", default).upper()
+    return getattr(logging, level_str, logging.INFO)
+
+LOGGER_LEVEL = get_log_level()

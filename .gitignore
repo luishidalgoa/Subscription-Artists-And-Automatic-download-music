@@ -4,5 +4,6 @@
 # los json de config
 /config/artists.json
 /config/last_run.json
+/config/metadata_songs_cache.json
 /config/_cookies.txt
 /data/
