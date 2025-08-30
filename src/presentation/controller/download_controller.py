@@ -9,7 +9,7 @@ from src.utils.strings_formatter import sanitize_path_component
 logger = LoggerProvider()
 from src.infrastructure.config.config import now,COOKIES_FILE
 from src.infrastructure.service.console_reader_service import run_yt_dlp
-from src.infrastructure.service.file_service import obtener_subcarpetas
+from src.infrastructure.filesystem.directory_utils import obtener_subcarpetas
 from pathlib import Path
 
 def get_artist_playlists(url: str, artist_root: Path):

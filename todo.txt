@@ -1,0 +1,9 @@
+-> Hacer webscrapping de la pagina https://music.youtube.com/new_releases/albums
+
+
+-> extraer el artista de cada album y componer el url para descargar el album
+
+
+-> Agregar el comando para descargar un canal de YouTube concreto + desde que fecha
+
+-> Actualizaciones automaticas
