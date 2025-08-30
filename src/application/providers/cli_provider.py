@@ -66,6 +66,6 @@ class CLIProvider:
                     required = arg_data.get("params", {}).get("required", False)
                     print(f"    {arg_name} (required: {required}) - {help_text}")
 
-        print("\nUse 'yt_subs <command> [params]' to execute a command.\n")
+        print("\nUse 'yt-subs <command> [params]' to execute a command.\n")
 
 

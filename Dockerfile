@@ -29,5 +29,5 @@ RUN pip install -e .
 ENV YT_COMMAND="boot"
 
 # Comando por defecto (puedes sobreescribirlo)
-CMD ["sh", "-c", "yt_subs ${YT_COMMAND}"]
+CMD ["sh", "-c", "yt-subs ${YT_COMMAND}"]
 

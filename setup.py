@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="yt_subs",
+    name="yt-subs",
     version="1.0.0",
     packages=find_packages(),
     include_package_data=True,
@@ -12,7 +12,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "yt_subs=src.main:main"
+            "yt-subs=src.main:main"
         ]
     },
 )
