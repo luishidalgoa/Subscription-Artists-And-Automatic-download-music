@@ -1,6 +1,3 @@
-from mutagen.easyid3 import EasyID3
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3NoHeaderError,ID3
 from src.domain.base_command import BaseCommand
 from src.application.providers.logger_provider import LoggerProvider
 from src.infrastructure.audio.handler_factory import AudioHandlerFactory
@@ -8,6 +5,7 @@ from src.infrastructure.config.config import ROOT_PATH
 from src.infrastructure.filesystem.directory_utils import extract_files, obtener_subcarpetas
 from src.infrastructure.filesystem.json_loader import artists_load
 from src.infrastructure.service import album_postprocessor, yt_dlp_service
+from src.infrastructure.utils.progress_bar import ProgressBar
 from src.utils.Transform import Transform
 from src.domain.Metadata import Metadata
 from mutagen.mp4 import MP4
@@ -16,7 +14,6 @@ MetadataFields = list(vars(Metadata()).keys())
 
 MetadataFields.remove("Album")
 logger = LoggerProvider()
-
 
 class FetchMetadataCommand(BaseCommand):
     DESCRIPCION = "Extrae metadatos de una URL de YouTube usando yt-dlp y devuelve campos seleccionados"
@@ -38,40 +35,56 @@ class FetchMetadataCommand(BaseCommand):
         }
     }
 
+
     def handle(self, parsed_args):
         tags_to_extract = parsed_args.tags or MetadataFields
         artists_param = parsed_args.artists
 
         if artists_param == "All" or not artists_param:
-            for artist in artists_load():
+            artists = artists_load()
+            artist_bar = ProgressBar(total=len(artists), prefix="Artistas")
+
+            for artist in artists:
                 safe_name = Transform.sanitize_path_component(artist["name"])
                 artist_root = ROOT_PATH / safe_name
                 subfolders = obtener_subcarpetas(directorio=artist_root)
 
+                # Recolectamos canciones de todas las subcarpetas
+                all_songs = []
                 for _, ruta in subfolders.items():
-                    for song in extract_files(ruta):
-                        ext = str(song).rsplit(".", 1)[-1].lower()
-                        handler = AudioHandlerFactory.get_handler(ext)
-                        if not handler:
-                            logger.warning(f"Formato no soportado: {song}")
+                    all_songs.extend(extract_files(ruta))
+
+                song_bar = ProgressBar(total=len(all_songs), prefix=f"Canciones {artist['name']}")
+
+                for song in all_songs:
+                    ext = str(song).rsplit(".", 1)[-1].lower()
+                    handler = AudioHandlerFactory.get_handler(ext)
+                    if not handler:
+                        logger.warning(f"Formato no soportado: {song}")
+                        continue
+                    try:
+                        comment = handler.extract_comment(str(song))
+                        if not comment:
+                            logger.warning(f"No hay URL de YouTube en el archivo: {song}")
                             continue
-                        try:
-                            comment = handler.extract_comment(str(song))
-                            if not comment:
-                                logger.warning(f"No hay URL de YouTube en el archivo: {song}")
-                                continue
 
-                            raw_metadata = yt_dlp_service.fetch_raw_metadata(comment)
-                            metadata_obj = album_postprocessor.extract_metadata(raw_metadata, tags_to_extract)
+                        raw_metadata = yt_dlp_service.fetch_raw_metadata(comment)
+                        metadata_obj = album_postprocessor.extract_metadata(raw_metadata, tags_to_extract)
 
-                            audio = handler.open_file(str(song))
-                            handler.apply_metadata(audio, metadata_obj, tags_to_extract, artist=artist["name"])
-                            audio.save()
+                        audio = handler.open_file(str(song))
+                        handler.apply_metadata(audio, metadata_obj, tags_to_extract, artist=artist["name"])
+                        audio.save()
 
-                        except Exception as e:
-                            yt_dlp_service.flush_batch_cache()
-                            logger.error(f"Error procesando archivo {song}: {e}")
+                    except Exception as e:
                         yt_dlp_service.flush_batch_cache()
+                        logger.error(f"Error procesando archivo {song}: {e}")
+                    yt_dlp_service.flush_batch_cache()
+
+                    # Progreso de canciones
+                    song_bar.update()
+
+                # Al terminar el artista → progreso de artistas
+                artist_bar.update()
         else:
             logger.info(f"Procesando solo el artista especificado: {artists_param}")
             # Aquí iría la lógica para un artista específico
