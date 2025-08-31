@@ -6,7 +6,7 @@ from src.infrastructure.filesystem.json_loader import artists_load, last_run_loa
 from src.infrastructure.service.album_postprocessor import procesar_albumes
 import os
 from src.application.providers.logger_provider import LoggerProvider
-from src.utils.strings_formatter import sanitize_path_component
+from src.utils.Transform import Transform
 logger = LoggerProvider()
 from src.infrastructure.config.config import now,COOKIES_FILE
 from src.infrastructure.service.yt_dlp_service import run_yt_dlp
@@ -36,7 +36,7 @@ def get_artist_playlists(url: str, artist_root: Path):
             data = json.loads(line)
             if data.get("url") and "playlist" in data.get("url", ""):
                 raw_title = data.get("title", f"Playlist_{data['id']}")
-                title = sanitize_path_component(raw_title)
+                title = Transform.sanitize_path_component(raw_title)
                 # 3️⃣ Filtrar solo playlists que coinciden con subcarpetas
                 if title not in subfolders:
                     playlists.append({
@@ -56,7 +56,7 @@ def run_descargas():
         last_run = last_run_load()
 
         for artist in artists:
-            safe_name = sanitize_path_component(artist["name"])
+            safe_name = Transform.sanitize_path_component(artist["name"])
             url = artist["channel_url"]
             logger.info(f"▶ Procesando artista: {artist['name']}")
 
@@ -69,7 +69,7 @@ def run_descargas():
 
             # 2. recorrer playlists y descargarlas
             for pl in playlists:
-                safe_title = sanitize_path_component(pl["title"])
+                safe_title = Transform.sanitize_path_component(pl["title"])
                 logger.info(f"📁 Examinando playlist: {pl['title']}")
                 (output_path / safe_title).mkdir(parents=True, exist_ok=True)
                 output_template = str(output_path / safe_title / "%(title)s.%(ext)s")

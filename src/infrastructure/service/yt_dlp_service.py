@@ -126,14 +126,12 @@ def fetch_raw_metadata(url: str) -> Dict:
         else:
             artist_str = str(artists_list)
 
-        logger.info(f"Artistas: {artist_str}")
-
         # Extraer solo los campos deseados
         filtered_info = {
             "id": info.get("id"),
             "title": info.get("title"),
             "album": info.get("album"),
-            "year": info.get("release_date"),
+            "date": info.get("release_date"),
             "artist": artist_str
         }
 
