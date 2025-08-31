@@ -2,8 +2,8 @@ from src.domain.base_command import BaseCommand
 from src.application.providers.logger_provider import LoggerProvider
 from src.infrastructure.audio.handler_factory import AudioHandlerFactory
 from src.infrastructure.config.config import ROOT_PATH
-from src.infrastructure.filesystem.directory_utils import extract_files, obtener_subcarpetas
-from src.infrastructure.filesystem.json_loader import artists_load
+from src.infrastructure.system.directory_utils import extract_files, obtener_subcarpetas
+from src.infrastructure.system.json_loader import artists_load
 from src.infrastructure.service import album_postprocessor, yt_dlp_service
 from src.infrastructure.utils.progress_bar import ProgressBar
 from src.utils.Transform import Transform
@@ -32,6 +32,13 @@ class FetchMetadataCommand(BaseCommand):
                 "help": "Artistas a extraer: 'All' o un string específico",
                 "default": "All"
             }
+        },
+        "--omit": {
+            "params": {
+                "required": False,
+                "help": "Omite los elementos registrados en la cache",
+                "default": True
+            }
         }
     }
 
@@ -39,6 +46,7 @@ class FetchMetadataCommand(BaseCommand):
     def handle(self, parsed_args):
         tags_to_extract = parsed_args.tags or MetadataFields
         artists_param = parsed_args.artists
+        omit_cached = parsed_args.omit or True
 
         if artists_param == "All" or not artists_param:
             artists = artists_load()
@@ -57,6 +65,12 @@ class FetchMetadataCommand(BaseCommand):
                 song_bar = ProgressBar(total=len(all_songs), prefix=f"Canciones {artist['name']}")
 
                 for song in all_songs:
+                    # Progreso de canciones
+                    song_bar.update()
+                    if omit_cached:
+                        if yt_dlp_service.is_url_in_cache(comment):
+                            continue
+
                     ext = str(song).rsplit(".", 1)[-1].lower()
                     handler = AudioHandlerFactory.get_handler(ext)
                     if not handler:
@@ -79,9 +93,6 @@ class FetchMetadataCommand(BaseCommand):
                         yt_dlp_service.flush_batch_cache()
                         logger.error(f"Error procesando archivo {song}: {e}")
                     yt_dlp_service.flush_batch_cache()
-
-                    # Progreso de canciones
-                    song_bar.update()
 
                 # Al terminar el artista → progreso de artistas
                 artist_bar.update()

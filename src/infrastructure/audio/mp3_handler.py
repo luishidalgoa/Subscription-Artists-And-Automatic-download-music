@@ -43,7 +43,7 @@ class MP3Handler(BaseAudioHandler):
             audio.add_tags()
             return EasyID3(song_path)
 
-    def apply_metadata(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
+    def _apply_metadata_impl(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
         if artist:
             audio["albumartist"] = artist
         for tag in tags_to_extract:

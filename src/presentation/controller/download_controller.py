@@ -2,7 +2,7 @@
 import json
 import subprocess
 from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
-from src.infrastructure.filesystem.json_loader import artists_load, last_run_load
+from src.infrastructure.system.json_loader import artists_load, last_run_load
 from src.infrastructure.service.album_postprocessor import procesar_albumes
 import os
 from src.application.providers.logger_provider import LoggerProvider
@@ -10,7 +10,7 @@ from src.utils.Transform import Transform
 logger = LoggerProvider()
 from src.infrastructure.config.config import now,COOKIES_FILE
 from src.infrastructure.service.yt_dlp_service import run_yt_dlp
-from src.infrastructure.filesystem.directory_utils import obtener_subcarpetas
+from src.infrastructure.system.directory_utils import obtener_subcarpetas
 from pathlib import Path
 
 def get_artist_playlists(url: str, artist_root: Path):

@@ -29,7 +29,7 @@ class M4AHandler(BaseAudioHandler):
     def open_file(self, song_path: str):
         return MP4(song_path)
 
-    def apply_metadata(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
+    def _apply_metadata_impl(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
         if artist:
             audio["aART"] = [artist]
         for tag in tags_to_extract:
@@ -41,3 +41,4 @@ class M4AHandler(BaseAudioHandler):
                     audio["©ART"] = [str(value)]
                 elif tag == "Date":
                     audio["©day"] = [str(value)]
+
