@@ -4,7 +4,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.id3 import APIC, ID3, ID3NoHeaderError, error
 from src.domain.Metadata import Metadata
 from src.infrastructure.config import file_music_extension
-from src.infrastructure.filesystem.directory_utils import extract_files, obtener_subcarpetas
+from src.infrastructure.system.directory_utils import extract_files, obtener_subcarpetas
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
@@ -176,6 +176,9 @@ def extract_metadata(raw_metadata: Dict[str, Any], fields: List[str]) -> Metadat
         Recibe metadatos crudos y una lista de campos a extraer.
         Devuelve un objeto Metadata con solo los campos solicitados rellenados.
         """
+        if not raw_metadata:
+            return Metadata()  # Retorna un objeto vacío si no hay metadatos
+
         # Creamos un diccionario con solo los campos disponibles en raw_metadata
         data_for_model = {}
         for field in fields:

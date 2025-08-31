@@ -1,11 +1,4 @@
-"""
-try:
-            with ARTISTS_FILE.open() as f:
-                artists = json.load(f)
-        except Exception as e:
-            logger.error(f"Error al leer artists.json: {e}")
-            return
-"""
+# src/infrastructure/system/json_loader.py
 import json
 from src.application.providers.logger_provider import LoggerProvider
 from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, METADATA_SONGS_CACHE, ROOT_PATH
