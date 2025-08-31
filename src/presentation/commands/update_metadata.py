@@ -67,9 +67,6 @@ class FetchMetadataCommand(BaseCommand):
                 for song in all_songs:
                     # Progreso de canciones
                     song_bar.update()
-                    if omit_cached:
-                        if yt_dlp_service.is_url_in_cache(comment):
-                            continue
 
                     ext = str(song).rsplit(".", 1)[-1].lower()
                     handler = AudioHandlerFactory.get_handler(ext)
@@ -81,6 +78,10 @@ class FetchMetadataCommand(BaseCommand):
                         if not comment:
                             logger.warning(f"No hay URL de YouTube en el archivo: {song}")
                             continue
+                        
+                        if omit_cached:
+                            if yt_dlp_service.is_url_in_cache(comment):
+                                continue
 
                         raw_metadata = yt_dlp_service.fetch_raw_metadata(comment)
                         metadata_obj = album_postprocessor.extract_metadata(raw_metadata, tags_to_extract)
