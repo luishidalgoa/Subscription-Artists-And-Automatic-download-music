@@ -4,7 +4,7 @@ from src.infrastructure.repository.job_repository import JobRepository
 from src.application.providers.logger_provider import LoggerProvider
 from datetime import datetime
 
-from src.utils.time_formatter import seconds_to_ddhhmmss
+from src.utils.Transform import Transform
 
 logger = LoggerProvider()
 
@@ -19,7 +19,7 @@ class CheckJobsCommand(BaseCommand):
         for job in repo.get_jobs():
             if job.next_run_time:
                 interval_seconds = (job.next_run_time - datetime.now()).total_seconds()
-                interval_str = seconds_to_ddhhmmss(interval_seconds)
+                interval_str = Transform.seconds_to_ddhhmmss(interval_seconds)
             else:
                 interval_str = "N/A"
 

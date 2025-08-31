@@ -8,7 +8,7 @@ from src.infrastructure.repository.job_repository import JobRepository
 from src.domain.Job import Job
 from src.domain.scheduler.base_job import BaseJob
 from src.domain.scheduler.time_unit import TimeUnit
-from src.utils.time_formatter import convert_timeUnit_to_seconds
+from src.utils.Transform import Transform
 
 logger =LoggerProvider()
 
@@ -56,7 +56,7 @@ class SchedulerService:
             first_job = schedule_job(resume_interval_seconds, self._wrap_resume_job)
             return job_id
         else:
-            first_job = schedule_job(convert_timeUnit_to_seconds(job.get_interval(), job.get_time_unit()), self._wrap_job)
+            first_job = schedule_job(Transform.timeUnit_to_seconds(job.get_interval(), job.get_time_unit()), self._wrap_job)
             self.repo.upsert_job(
                 Job(
                     id=job_id,
@@ -95,7 +95,7 @@ class SchedulerService:
             schedule.clear(job_id)
 
             # Reprogramamos con el intervalo original
-            new_job = schedule.every(convert_timeUnit_to_seconds(job.get_interval(), job.get_time_unit())).seconds.do(self._wrap_job, job_id, job)
+            new_job = schedule.every(timeUnit_to_seconds(job.get_interval(), job.get_time_unit())).seconds.do(self._wrap_job, job_id, job)
             new_job.tag(job_id)
             
             db_job.is_resumed = False
