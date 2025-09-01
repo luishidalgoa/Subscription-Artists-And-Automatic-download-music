@@ -64,7 +64,8 @@ class CLIProvider:
                 for arg_name, arg_data in base_cmd.ARGUMENTOS.items():
                     help_text = arg_data.get("params", {}).get("help", "")
                     required = arg_data.get("params", {}).get("required", False)
-                    print(f"    {arg_name} (required: {required}) - {help_text}")
+                    default = arg_data.get("params", {}).get("default", None)
+                    print(f"    {arg_name} (required: {required} {f', default: {default}' if default is not None else ''}) - {help_text}")
 
         print("\nUse 'yt-subs <command> [params]' to execute a command.\n")
 

@@ -10,13 +10,15 @@ DESCRIPCION = "Ejecuta la actualización de la app, descarga el contenido de you
 class RunNowCommand(BaseCommand):
     DESCRIPCION = DESCRIPCION
     ARGUMENTOS = {
-        "--new-playlists-download-all": {
+        "--ignore-date-new": {
             "help": "Si se crea una carpeta nueva para una playlist, descarga todo su contenido ignorando la fecha.",
-            "action": "store_true"
+            "action": "store_true",
+            "default": True,
+            "required": True,
         }
     }
 
     def handle(self, parsed_args):
         logger.info("▶ Ejecución de descargas automáticas...")
-        new_playlists_download_all = getattr(parsed_args, "new_playlists_download_all", False)
+        new_playlists_download_all = getattr(parsed_args, "new_playlists_download_all", True)
         DownloadJob(new_playlists_download_all=new_playlists_download_all).run()
