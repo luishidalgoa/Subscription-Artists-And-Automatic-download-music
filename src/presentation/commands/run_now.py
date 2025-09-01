@@ -10,13 +10,15 @@ DESCRIPCION = "Ejecuta la actualización de la app, descarga el contenido de you
 class RunNowCommand(BaseCommand):
     DESCRIPCION = DESCRIPCION
     ARGUMENTOS = {
-        "--ignore-date-new": {
-            "help": "Si se crea una carpeta nueva para una playlist, descarga todo su contenido ignorando la fecha.",
-            "action": "store_true",
-            "default": True,
-            "required": True,
+        "--tags": {
+            "params": {
+                "required": True,
+                "help": "Si se crea una carpeta nueva para una playlist, descarga todo su contenido ignorando la fecha.",
+                "default": True
+            }
         }
     }
+
 
     def handle(self, parsed_args):
         logger.info("▶ Ejecución de descargas automáticas...")
