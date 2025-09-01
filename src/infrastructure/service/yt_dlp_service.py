@@ -34,9 +34,27 @@ def detect_video_unavailable(line: str) -> bool:
         return True
     return False
 
+def detect_no_videos(line: str) -> bool:
+    """
+    Detecta cuando yt-dlp finaliza sin descargar nada porque no hay vídeos válidos.
+    Esto ocurre típicamente con el código de salida 101:
+      - Playlist vacía.
+      - Todos los vídeos ya descargados o no disponibles.
+      - Filtros (ej. --dateafter) que descartan todos los vídeos.
+    
+    Si se detecta, se registra una advertencia en el log y devuelve True
+    para que el proceso no se considere un error crítico.
+    """
+    if "No videos to download" in line or "no videos" in line.lower():
+        logger.warning("⚠️ No hay vídeos nuevos en esta playlist.")
+        return True
+    return False
+
+
 ERROR_DETECTORS = [
     detect_ip_ban,
     detect_video_unavailable,
+    detect_no_videos,
 ]
 
 def run_yt_dlp(command: list[str]) -> bool:
