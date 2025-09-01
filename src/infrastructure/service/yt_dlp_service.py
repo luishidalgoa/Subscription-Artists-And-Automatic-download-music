@@ -46,8 +46,8 @@ def detect_no_videos(line: str, returncode: int) -> bool:
     para que el proceso no se considere un error crítico.
     """
     if returncode == 101 or "No videos to download" in line or "no videos" in line.lower():
-        logger.warning("⚠️ No hay vídeos nuevos en esta playlist.")
-        return True
+        logger.warning("⚠️ El video de la playlist que se esta analizando, no es nuevo.")
+        return False #no es critico
     return False
 
 

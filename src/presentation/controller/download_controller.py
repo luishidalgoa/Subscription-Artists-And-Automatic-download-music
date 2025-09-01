@@ -50,7 +50,7 @@ def get_artist_playlists(url: str, artist_root: Path):
     return playlists
 
 
-def run_descargas():
+def run_descargas(new_playlists_download_all: bool = False):
     try:
         artists = artists_load()
         last_run = last_run_load()
@@ -64,16 +64,16 @@ def run_descargas():
             output_path = ROOT_PATH / safe_name
             output_path.mkdir(parents=True, exist_ok=True)
 
-            # 1. obtener todas las playlists del artista
             playlists = get_artist_playlists(url, output_path)
 
-            # 2. recorrer playlists y descargarlas
             for pl in playlists:
                 safe_title = Transform.sanitize_path_component(pl["title"])
-                logger.info(f"📁 Examinando playlist: {pl['title']}")
-                (output_path / safe_title).mkdir(parents=True, exist_ok=True)
-                output_template = str(output_path / safe_title / "%(title)s.%(ext)s")
+                playlist_path = output_path / safe_title
+                is_new = not playlist_path.exists()
+                playlist_path.mkdir(parents=True, exist_ok=True)
+                output_template = str(playlist_path / "%(title)s.%(ext)s")
 
+                # Si la carpeta es nueva y se pasó el flag, no aplicamos --dateafter
                 cmd = [
                     "yt-dlp",
                     "--cookies", str(COOKIES_FILE),
@@ -85,28 +85,29 @@ def run_descargas():
                     "--embed-thumbnail",
                     "--sleep-interval", "5",
                     "--max-sleep-interval", "10",
-                    "--dateafter", since_time[:10].replace('-', ''),
                     "--break-on-reject",
                     "-o", output_template,
                     pl["url"]
                 ]
 
+                if not (is_new and new_playlists_download_all):
+                    cmd.insert(-1, "--dateafter")
+                    cmd.insert(-1, since_time[:10].replace('-', ''))
+
                 success = run_yt_dlp(cmd)
 
                 if not success:
                     logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {artist['name']}.")
-                    return  # aborta todo el proceso del script
+                    return
 
-            # 3. procesar álbumes del artista al terminar todas sus playlists
             if playlists:
                 logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
                 procesar_albumes(output_path)
             else:
                 logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
-                
+
             last_run[artist["name"]] = now
 
-        # guardar marcas de última ejecución
         with LAST_RUN_FILE.open("w") as f:
             json.dump(last_run, f, indent=2)
             f.flush()
@@ -115,5 +116,4 @@ def run_descargas():
         logger.info("✅ Proceso completado.")
 
     except KeyboardInterrupt:
-        # Aquí capturamos Ctrl+C y mostramos un mensaje personalizado
         logger.error("❌ Descarga interrumpida manualmente por el usuario. Todos los procesos activos se detuvieron.")
