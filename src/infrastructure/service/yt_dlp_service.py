@@ -63,7 +63,7 @@ def run_yt_dlp(command: list[str]) -> bool:
     Devuelve True si no se detectó ningún error crítico,
     False si hubo que abortar.
     """
-    output, success, detected_error = run_subprocess_with_detectors(command, ERROR_DETECTORS)
+    output, success, detected_error,returncode = run_subprocess_with_detectors(command, ERROR_DETECTORS)
 
     # Opcional: detectar descarga completada desde la salida
     for line in output.splitlines():
@@ -110,7 +110,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
     if COOKIES_FILE.exists():
         cmd += ["--cookies", str(COOKIES_FILE)]
 
-    output, success, detected_error = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)
+    output, success, detected_error,returncode = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)
 
     if not success:
         if detected_error and "Video unavailable" in detected_error:

@@ -56,7 +56,11 @@ def run_subprocess_with_detectors(
 
     # 🔹 Captura errores desconocidos
     if process.returncode != 0 and success:
-        raise RuntimeError(f"⚠️ Comando falló con código {process.returncode} pero ningún detector lo reconoció: {detected_error}")
+        logger.error(
+            f"⚠️ Comando falló con código {process.returncode} "
+            f"pero ningún detector lo reconoció. Salida parcial: {detected_error or 'ninguno'}"
+        )
+        raise RuntimeError("Proceso terminado con error")
 
-    return full_output, success, detected_error
+    return full_output, success, detected_error, process.returncode
 
