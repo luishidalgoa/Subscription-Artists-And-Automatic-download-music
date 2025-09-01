@@ -18,5 +18,5 @@ class RunNowCommand(BaseCommand):
 
     def handle(self, parsed_args):
         logger.info("▶ Ejecución de descargas automáticas...")
-        new_playlists_download_all = parsed_args.get("--new-playlists-download-all", False)
+        new_playlists_download_all = getattr(parsed_args, "new_playlists_download_all", False)
         DownloadJob(new_playlists_download_all=new_playlists_download_all).run()

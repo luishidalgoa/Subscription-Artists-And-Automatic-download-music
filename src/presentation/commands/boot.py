@@ -15,7 +15,7 @@ class BootCommand(BaseCommand):
 
     def handle(self, parsed_args):
         scheduler = SchedulerService()
-        download_job_instance = DownloadJob()
+        download_job_instance = DownloadJob(new_playlists_download_all=True)
         existing_job = scheduler.get_job_by_name(download_job_instance.get_name())
 
         if existing_job:
