@@ -7,14 +7,14 @@ logger = LoggerProvider()
 
 def run_subprocess_with_detectors(
     command: List[str],
-    detectors: List[Callable[[str], bool]],
+    detectors: List[Callable[[str, Optional[int]], bool]],
 ) -> Tuple[str, bool, Optional[str], int]:
     """
     Ejecuta un comando en subprocess y lee línea por línea en streaming.
 
     Args:
         command: lista de argumentos del comando.
-        detectors: lista de funciones detectoras que reciben cada línea.
+        detectors: lista de funciones detectoras que reciben cada línea y opcionalmente el returncode.
 
     Returns:
         (output, success, detected_error, returncode)
@@ -35,32 +35,41 @@ def run_subprocess_with_detectors(
     detected_error = None
     success = True
 
+    # 🔹 Leer líneas en streaming y llamar a detectores que dependen solo de líneas
     for line in process.stdout:
         line = line.strip()
         if line:
             output_lines.append(line)
-
             for detector in detectors:
-                if detector(line):
+                # Pasamos None como returncode en tiempo real
+                if detector(line, None):
                     detected_error = line
                     success = False
                     process.terminate()
                     process.wait()
                     break
-
         if not success:
             break
 
     process.wait()
+    returncode = process.returncode
     full_output = "\n".join(output_lines)
 
+    # 🔹 Detectores que dependen del returncode
+    if success:  # solo si no se disparó ninguno antes
+        for detector in detectors:
+            if detector(full_output, returncode):
+                detected_error = full_output
+                success = False
+                break
+
     # 🔹 Captura errores desconocidos
-    if process.returncode != 0 and success:
+    if returncode != 0 and success:
         logger.error(
-            f"⚠️ Comando falló con código {process.returncode} "
+            f"⚠️ Comando falló con código {returncode} "
             f"pero ningún detector lo reconoció. Salida parcial: {detected_error or 'ninguno'}"
         )
         raise RuntimeError("Proceso terminado con error")
 
-    return full_output, success, detected_error, process.returncode
+    return full_output, success, detected_error, returncode
 

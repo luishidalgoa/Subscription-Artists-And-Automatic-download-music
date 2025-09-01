@@ -13,7 +13,7 @@ from src.infrastructure.system.subprocess_runner import run_subprocess_with_dete
 
 logger= LoggerProvider()
 
-def detect_ip_ban(line: str) -> bool:
+def detect_ip_ban(line: str, returncode: int) -> bool:
     patterns = [
         "Sign in to confirm you’re not a bot",
         "Sign in to confirm you're not a bot",
@@ -24,7 +24,7 @@ def detect_ip_ban(line: str) -> bool:
         return True
     return False
 
-def detect_video_unavailable(line: str) -> bool:
+def detect_video_unavailable(line: str, returncode: int) -> bool:
     patterns = [
         "Video unavailable",
         "This video is not available"
@@ -34,7 +34,7 @@ def detect_video_unavailable(line: str) -> bool:
         return True
     return False
 
-def detect_no_videos(line: str) -> bool:
+def detect_no_videos(line: str, returncode: int) -> bool:
     """
     Detecta cuando yt-dlp finaliza sin descargar nada porque no hay vídeos válidos.
     Esto ocurre típicamente con el código de salida 101:
@@ -45,7 +45,7 @@ def detect_no_videos(line: str) -> bool:
     Si se detecta, se registra una advertencia en el log y devuelve True
     para que el proceso no se considere un error crítico.
     """
-    if "No videos to download" in line or "no videos" in line.lower():
+    if returncode == 101 or "No videos to download" in line or "no videos" in line.lower():
         logger.warning("⚠️ No hay vídeos nuevos en esta playlist.")
         return True
     return False
