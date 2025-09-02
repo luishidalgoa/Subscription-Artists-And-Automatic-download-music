@@ -10,10 +10,10 @@ DESCRIPCION = "Ejecuta la actualización de la app, descarga el contenido de you
 class RunNowCommand(BaseCommand):
     DESCRIPCION = DESCRIPCION
     ARGUMENTOS = {
-        "--tags": {
+        "--ignore-new-playlists-date": {
             "params": {
                 "required": True,
-                "help": "Si se crea una carpeta nueva para una playlist, descarga todo su contenido ignorando la fecha.",
+                "help": "Ignora la fecha de las canciones dentro de una playlist nueva.",
                 "default": True
             }
         }
