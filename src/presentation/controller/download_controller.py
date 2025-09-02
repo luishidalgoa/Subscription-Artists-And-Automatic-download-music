@@ -1,7 +1,7 @@
 # app/controller/download_controller.py
 import json
 import subprocess
-from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, ROOT_PATH
+from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, MUSIC_ROOT_PATH
 from src.infrastructure.system.json_loader import artists_load, last_run_load
 from src.infrastructure.service.album_postprocessor import procesar_albumes
 import os
@@ -61,7 +61,7 @@ def run_descargas(new_playlists_download_all: bool = False):
             logger.info(f"▶ Procesando artista: {artist['name']}")
 
             since_time = last_run.get(artist["name"], now)
-            output_path = ROOT_PATH / safe_name
+            output_path = MUSIC_ROOT_PATH / safe_name
             output_path.mkdir(parents=True, exist_ok=True)
 
             playlists = get_artist_playlists(url, output_path)

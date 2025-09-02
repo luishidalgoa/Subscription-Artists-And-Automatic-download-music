@@ -1,7 +1,7 @@
 from src.domain.base_command import BaseCommand
 from src.application.providers.logger_provider import LoggerProvider
 from src.infrastructure.audio.handler_factory import AudioHandlerFactory
-from src.infrastructure.config.config import ROOT_PATH
+from src.infrastructure.config.config import MUSIC_ROOT_PATH
 from src.infrastructure.system.directory_utils import extract_files, obtener_subcarpetas
 from src.infrastructure.system.json_loader import artists_load
 from src.infrastructure.service import album_postprocessor, yt_dlp_service
@@ -54,7 +54,7 @@ class FetchMetadataCommand(BaseCommand):
 
             for artist in artists:
                 safe_name = Transform.sanitize_path_component(artist["name"])
-                artist_root = ROOT_PATH / safe_name
+                artist_root = MUSIC_ROOT_PATH / safe_name
                 subfolders = obtener_subcarpetas(directorio=artist_root)
 
                 # Recolectamos canciones de todas las subcarpetas

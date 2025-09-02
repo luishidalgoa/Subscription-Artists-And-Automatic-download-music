@@ -20,7 +20,7 @@ def update_now():
     now = datetime.now(timezone.utc).isoformat()[:19]
 
 # Paths principales
-ROOT_PATH = Path(os.getenv("ROOT_PATH", "/music")).resolve()
+MUSIC_ROOT_PATH = Path(os.getenv("MUSIC_ROOT_PATH", "/music")).resolve()
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", CONFIG_DIR)).resolve()
 
 # Archivos de configuración persistente

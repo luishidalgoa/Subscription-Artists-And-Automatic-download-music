@@ -1,7 +1,7 @@
 #app/presentation/commands/process_albums.py
 from src.domain.base_command import BaseCommand
 from src.infrastructure.service.album_postprocessor import procesar_albumes
-from src.infrastructure.config.config import ARTISTS_FILE, ROOT_PATH
+from src.infrastructure.config.config import ARTISTS_FILE, MUSIC_ROOT_PATH
 from src.application.providers.logger_provider import LoggerProvider
 import json
 
@@ -44,5 +44,5 @@ class ProcessAlbumsCommand(BaseCommand):
             if artist and name != artist:
                 continue
 
-            output_path = ROOT_PATH / name
+            output_path = MUSIC_ROOT_PATH / name
             procesar_albumes(output_path, {"filter_by_date": False})

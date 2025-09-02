@@ -1,7 +1,7 @@
 # src/infrastructure/system/json_loader.py
 import json
 from src.application.providers.logger_provider import LoggerProvider
-from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, METADATA_SONGS_CACHE, ROOT_PATH
+from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, METADATA_SONGS_CACHE, MUSIC_ROOT_PATH
 
 logger = LoggerProvider()
 def artists_load():
