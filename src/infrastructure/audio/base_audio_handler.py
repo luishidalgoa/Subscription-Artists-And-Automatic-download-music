@@ -1,5 +1,6 @@
 # src/infrastructure/audio/base_audio_handler.py
 from abc import ABC, abstractmethod
+from pathlib import Path
 from venv import logger
 from src.domain.Metadata import Metadata
 
@@ -37,3 +38,15 @@ class BaseAudioHandler(ABC):
         # si todos los atributos son None, hacemos return
         if not any(value is not None for value in attrs.values()):
             return
+
+    def getMetadata(self, file: Path, tags_to_extract: list) -> Metadata:
+        """
+        Extrae metadatos del archivo de audio.
+        """
+        audio = self.open_file(file)
+        metadata = Metadata()
+        for tag in tags_to_extract:
+            value = audio.get(tag.lower())
+            if value:
+                setattr(metadata, tag, value[0] if isinstance(value, list) else value)
+        return metadata

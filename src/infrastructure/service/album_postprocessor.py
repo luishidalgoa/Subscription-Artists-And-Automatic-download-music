@@ -58,7 +58,7 @@ def actualizar_portada(songs_files: list[Path], artista: str):
         logger.info(f"[INFO] Portada actualizada en {mp3_file.name}")
 
 
-def renombrar_con_indice_en(songs_files: list[Path], artista: str) -> list[Path]:
+def renombrar_con_indice_en(songs_files: list[Path]) -> list[Path]:
     renombrados = []
     for i, archivo in enumerate(songs_files, start=1):
         nombre_limpio = re.sub(r"^\d{2}\. ", "", archivo.name)
@@ -69,7 +69,12 @@ def renombrar_con_indice_en(songs_files: list[Path], artista: str) -> list[Path]
             archivo.rename(nuevo_path)
             archivo = nuevo_path  # Actualizar referencia
 
-        actualizar_metadatos_por_defecto(archivo, i, artista)
+        try:
+            audio = EasyID3(archivo)
+        except ID3NoHeaderError:
+            audio = EasyID3()
+
+        audio["tracknumber"] = str(i)
         renombrados.append(archivo)
 
     return renombrados
@@ -144,6 +149,7 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
         if mp3s_a_procesar:
             eliminar_previews(mp3s_a_procesar)
             mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar, artista_path.name)
+            actualizar_metadatos_por_defecto(mp3s_a_procesar)
             actualizar_portada(mp3s_a_procesar, artista_path.name)
 
 def filtrar_mp3s_por_fecha(songs_files: List[Path], referencia_iso: str, margen_minutos: int = 5) -> List[Path]:
@@ -157,19 +163,44 @@ def filtrar_mp3s_por_fecha(songs_files: List[Path], referencia_iso: str, margen_
     return filtrados
 
 
-def actualizar_metadatos_por_defecto(archivo: Path, numero: int, artista: str) -> Path:
-    try:
-        audio = EasyID3(archivo)
-    except ID3NoHeaderError:
-        audio = EasyID3()
+from pathlib import Path
+from typing import Union, List
+from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3NoHeaderError
 
-    audio["tracknumber"] = str(numero)
-    audio["albumartist"] = artista
-    audio["artist"] = artista.replace(",", ";")
-    if not audio.get("album"):
-        audio["album"] = archivo.parent.name
-    audio.save(archivo)
+def actualizar_metadatos_por_defecto(archivo: Union[Path, List[Path]]) -> Union[Path, List[Path]]:
+    """Actualiza metadatos por defecto en uno o varios archivos MP3. modifica 'albumartist', 'artist' y 'album' si no existen."""
+    archivos = [archivo] if isinstance(archivo, Path) else archivo
+
+    for f in archivos:
+        try:
+            try:
+                audio = EasyID3(f)
+            except ID3NoHeaderError:
+                audio = EasyID3()
+            
+            # Album artist: carpeta padre del artista
+            if f.parent.parent and f.parent.parent.name:
+                audio["albumartist"] = f.parent.parent.name
+            else:
+                audio["albumartist"] = "Unknown Artist"
+            
+            # Artist: reemplazar comas por ;
+            if "artist" in audio and audio["artist"]:
+                audio["artist"] = audio["artist"].replace(",", ";")
+            else:
+                audio["artist"] = f.parent.parent.name if f.parent.parent else "Unknown Artist"
+            
+            # Album
+            if not audio.get("album"):
+                audio["album"] = f.parent.name if f.parent.name else "Unknown Album"
+            
+            audio.save(f)
+        except Exception as e:
+            print(f"Error actualizando metadatos de {f}: {e}")
+
     return archivo
+
 
 def extract_metadata(raw_metadata: Dict[str, Any], fields: List[str]) -> Metadata:
         """

@@ -21,6 +21,7 @@ def update_now():
 
 # Paths principales
 MUSIC_ROOT_PATH = Path(os.getenv("MUSIC_ROOT_PATH", "/music")).resolve()
+TEMP_MUSIC_PATH = Path(os.getenv("TEMP_MUSIC_PATH", "/Workspace/temp")).resolve()
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", CONFIG_DIR)).resolve()
 
 # Archivos de configuración persistente

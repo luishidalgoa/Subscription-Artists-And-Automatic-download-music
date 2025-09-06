@@ -15,8 +15,7 @@ from pathlib import Path
 
 def get_artist_playlists(url: str, artist_root: Path):
     """
-    Devuelve solo las playlists cuyo título que no coincide con alguna subcarpeta
-    existente dentro del root del artista.
+    Devuelve la diferencia entre las playlists obtenidas del canal de youtube del artista y las subcarpetas ya existentes.
     """
     # 1️⃣ Obtener subcarpetas existentes
     subfolders = obtener_subcarpetas(artist_root)  # {nombre_carpeta: Path}
