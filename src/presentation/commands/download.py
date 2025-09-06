@@ -55,8 +55,7 @@ class DownloadCommand(BaseCommand):
                 "-o", temp_output_path, url
         ]
 
-        #success = yt_dlp_service.run_yt_dlp(cmd) 
-        success = True
+        success = yt_dlp_service.run_yt_dlp(cmd)
 
         if not success:
             logger.error("La descarga falló o no se encontraron nuevos archivos.")
