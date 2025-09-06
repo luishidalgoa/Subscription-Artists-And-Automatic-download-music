@@ -55,14 +55,15 @@ class DownloadCommand(BaseCommand):
                 "-o", temp_output_path, url
         ]
 
-        success = yt_dlp_service.run_yt_dlp(cmd) 
+        #success = yt_dlp_service.run_yt_dlp(cmd) 
+        success = True
 
         if not success:
             logger.error("La descarga falló o no se encontraron nuevos archivos.")
             return
 
         files = extract_files(TEMP_MUSIC_PATH)
-        album_postprocessor.renombrar_con_indice_en(files)
+        files = album_postprocessor.renombrar_con_indice_en(files)
 
         first:bool = True
         album_name:str = None
@@ -79,35 +80,37 @@ class DownloadCommand(BaseCommand):
 
                 tags_to_extract = list(vars(Metadata()).keys())
                 tags_to_extract.remove("Album")
+
                 metadata_obj = album_postprocessor.extract_metadata(raw_metadata, tags_to_extract)
 
                 if not artist:
-                     artist = Transform.sanitize_path_component(metadata_obj.Artist)
+                    artist = Transform.sanitize_path_component(metadata_obj.Artist)
+                     #si contiene un array de artistas por ejemplo "Artist1; Artist2". nos quedamos con el primero
+                    if artist and ";" in artist:
+                        artist = artist.split(";")[0].strip()
 
                 if first:
-                     first = False
-                     album_postprocessor.actualizar_portada(files,artist)
+                    first = False
+                    album_postprocessor.actualizar_portada(files,artist)
 
-                     album_name = Transform.sanitize_path_component(handler.getMetadata(song,["Album"]).Album)
+                    album_name = Transform.sanitize_path_component(handler.getMetadata(song,["Album"]).Album)
 
                      #comprobamos que existe en /music/ un artista con el mismo nombre
-                     for artist in MUSIC_ROOT_PATH.iterdir():
-                        if artist.is_dir() and artist.name.lower() == metadata_obj.Artist.lower():
-                            artist = artist.name
+                    for directory in MUSIC_ROOT_PATH.iterdir():
+                        if directory.is_dir() and directory.name.lower() == metadata_obj.Artist.lower():
+                            artist = directory.name
                             break
                             
-
                 #debe abrirse despues de actualizar portada por que si no, sobreescribe la portada nueva por la antigua
                 audio = handler.open_file(str(song))
-                handler.apply_metadata(audio, metadata_obj, tags_to_extract, artist=artist)
+                handler.apply_metadata(audio, metadata_obj, tags_to_extract, artist)
                 audio.save()
             except Exception as e:
                     yt_dlp_service.flush_batch_cache()
                     logger.error(f"Error procesando archivo {song}: {e}")
         
-        #mover a carpeta artista. creando la carpeta del album
         final_path = MUSIC_ROOT_PATH / artist / album_name
-        #creamos la carpeta del album si no existe dentro del artista
+        
         if album_name:
             final_path.mkdir(parents=True, exist_ok=True)
             for song in files:

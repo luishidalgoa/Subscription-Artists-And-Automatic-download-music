@@ -18,7 +18,7 @@ class BaseAudioHandler(ABC):
     def _apply_metadata_impl(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
         """Subclase implementa la aplicación de metadatos."""
 
-    def apply_metadata(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str = None):
+    def apply_metadata(self, audio, metadata_obj: Metadata, tags_to_extract: list, artist: str):
         """
         Método plantilla: siempre valida antes de aplicar metadatos.
         """
