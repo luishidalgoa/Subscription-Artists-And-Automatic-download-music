@@ -1,9 +1,7 @@
 # app/service/console.reader.service.py
-from ast import Tuple
+from typing import Tuple, Optional, Callable, List, Dict
 import json
-from os import replace
 import random
-import subprocess
 import time
 from typing import Dict
 from src.application.providers.logger_provider import LoggerProvider
@@ -21,18 +19,23 @@ def detect_ip_ban(line: str, returncode: int) -> bool:
     ]
     if any(p in line for p in patterns):
         logger.error("🚫 YouTube ha bloqueado temporalmente la IP (captcha / bot check).")
-        return True
-    return False
+        return True, True
+    return False, False
 
-def detect_video_unavailable(line: str, returncode: int) -> bool:
+def detect_video_unavailable(line: str, returncode: int) -> Tuple[bool, bool]:
+    """
+    Devuelve (detected, critical):
+      - detected: True si coincidió con el patrón
+      - critical: True si debe detener todo el proceso
+    """
     patterns = [
         "Video unavailable",
         "This video is not available"
     ]
     if any(p in line for p in patterns):
         logger.error(f"🚫 Video no disponible")
-        return True
-    return False
+        return True, False  # no es crítico
+    return False, False
 
 def detect_no_videos(line: str, returncode: int) -> bool:
     """
@@ -47,8 +50,8 @@ def detect_no_videos(line: str, returncode: int) -> bool:
     """
     if returncode == 101 or "No videos to download" in line or "no videos" in line.lower():
         logger.warning("⚠️ El video de la playlist que se esta analizando, no es nuevo.")
-        return False #no es critico
-    return False
+        return True, False
+    return False, False
 
 
 ERROR_DETECTORS = [
@@ -116,7 +119,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         if detected_error and "Video unavailable" in detected_error:
             _batch_cache[url] = {}
             _disk_cache[url] = {}
-        return None
+            return None
     
     try:
         info = json.loads(output)

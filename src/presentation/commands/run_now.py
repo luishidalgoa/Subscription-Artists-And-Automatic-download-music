@@ -12,7 +12,7 @@ class RunNowCommand(BaseCommand):
     ARGUMENTOS = {
         "--ignore-new-playlists-date": {
             "params": {
-                "required": True,
+                "required": False,
                 "help": "Ignora la fecha de las canciones dentro de una playlist nueva.",
                 "default": True
             }

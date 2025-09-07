@@ -60,7 +60,7 @@ def extraer_tags(mp3: Path) -> dict[str, str]:
         "album": get_tag(['TALB', 'album']),
     }
 
-def artista_coincide(albumartist_api: str, artist_api: str, albumartist_mp3: str, artist_mp3: str) -> bool:
+def _artista_coincide(albumartist_api: str, artist_api: str, albumartist_mp3: str, artist_mp3: str) -> bool:
     """
     Valida si el artista del API Deezer coincide con albumartist o alguno de los artistas (separados por coma) del mp3.
     """
@@ -156,12 +156,12 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
         nombre_album_api_norm = normalize_str(nombre_album_api)
         album_norm_norm = normalize_str(album_norm)
 
-        if artista_coincide(
-                albumartist_api=artista_api,
-                artist_api=artista_api,
-                albumartist_mp3=albumartist_norm,
-                artist_mp3=artist_norm
-            ) and re.search(re.escape(album_norm_norm), nombre_album_api_norm) and portada_url:
+        if _artista_coincide(
+        albumartist_api=artista_api,
+        artist_api=artista_api,
+        albumartist_mp3=albumartist_norm,
+        artist_mp3=artist_norm
+        ) and portada_url:
             img = _download_image(portada_url)
             if img:
                 return img
@@ -204,12 +204,12 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
         nombre_album_api_norm = normalize_str(nombre_album_api)
         album_norm_norm = normalize_str(album_norm)
 
-        if artista_coincide(
-                albumartist_api=artista_api,
-                artist_api=artista_api,
-                albumartist_mp3=albumartist_norm,
-                artist_mp3=artist_norm
-            ) and re.search(re.escape(album_norm_norm), nombre_album_api_norm) and portada_url:
+        if _artista_coincide(
+        albumartist_api=artista_api,
+        artist_api=artista_api,
+        albumartist_mp3=albumartist_norm,
+        artist_mp3=artist_norm
+        ) and portada_url:
             img = _download_image(portada_url)
             if img:
                 return img
@@ -234,7 +234,7 @@ def obtener_portada_album(mp3: Path) -> Optional[bytes]:
                     or entry.get("album", {}).get("cover_medium")
                 )
                 
-            if nombre_album_api == album_norm and portada_url:
+            if portada_url:
                 img = _download_image(portada_url)
                 if img:
                     return img

@@ -22,12 +22,12 @@ def actualizar_portada(songs_files: list[Path], artista: str):
         return
 
     primer_mp3 = songs_files[0]
-    album = primer_mp3.parent.name
 
     try:
         audio_easy = EasyID3(primer_mp3)
         title = audio_easy.get("title", [""])[0]
         artist_tag = audio_easy.get("albumartist", [""])[0] or artista
+        album = audio_easy.get("album", [""])[0]
 
         portada_bytes = obtener_portada_album(primer_mp3)
         if not portada_bytes:
@@ -75,6 +75,7 @@ def renombrar_con_indice_en(songs_files: list[Path]) -> list[Path]:
             audio = EasyID3()
 
         audio["tracknumber"] = str(i)
+        audio.save(archivo)
         renombrados.append(archivo)
 
     return renombrados
@@ -148,8 +149,8 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
         logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
         if mp3s_a_procesar:
             eliminar_previews(mp3s_a_procesar)
-            mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar, artista_path.name)
-            actualizar_metadatos_por_defecto(mp3s_a_procesar)
+            mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar)
+            mp3s_a_procesar =actualizar_metadatos_por_defecto(mp3s_a_procesar)
             actualizar_portada(mp3s_a_procesar, artista_path.name)
 
 def filtrar_mp3s_por_fecha(songs_files: List[Path], referencia_iso: str, margen_minutos: int = 5) -> List[Path]:

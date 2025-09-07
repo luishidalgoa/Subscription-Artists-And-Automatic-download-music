@@ -16,7 +16,7 @@ MetadataFields.remove("Album")
 logger = LoggerProvider()
 
 class FetchMetadataCommand(BaseCommand):
-    DESCRIPCION = "Extrae metadatos de una URL de YouTube usando yt-dlp y devuelve campos seleccionados"
+    DESCRIPCION = "Extrae metadatos de YouTube usando yt-dlp e inserta campos seleccionados dentro de los archivos de audio existentes."
     ARGUMENTOS = {
         "--tags": {
             "params": {

@@ -41,15 +41,16 @@ def run_subprocess_with_detectors(
         if line:
             output_lines.append(line)
             for detector in detectors:
-                # Pasamos None como returncode en tiempo real
-                if detector(line, None):
+                detected, critical = detector(line, None)
+                if detected:
                     detected_error = line
-                    success = False
-                    process.terminate()
-                    process.wait()
-                    break
-        if not success:
-            break
+                    if critical:
+                        success = False
+                        process.terminate()
+                        process.wait()
+                        break
+            if not success:
+                break
 
     process.wait()
     returncode = process.returncode
@@ -67,7 +68,7 @@ def run_subprocess_with_detectors(
     if returncode != 0 and success:
         logger.error(
             f"⚠️ Comando falló con código {returncode} "
-            f"pero ningún detector lo reconoció. Salida parcial: {detected_error or 'ninguno'}"
+            f"pero ningún detector lo reconoció. Salida parcial: {detected_error or 'ninguno'}, full output:\n{full_output}"
         )
         raise RuntimeError("Proceso terminado con error")
 
