@@ -32,9 +32,6 @@ class DownloadCommand(BaseCommand):
         },
     }
     def handle(self, parsed_args):
-        if TEMP_MUSIC_PATH.exists():
-            shutil.rmtree(TEMP_MUSIC_PATH)
-
         artist: str = Transform.sanitize_path_component(parsed_args.artist) if parsed_args.artist else None
         if not parsed_args.url:
             raise ValueError("La URL es obligatoria")
