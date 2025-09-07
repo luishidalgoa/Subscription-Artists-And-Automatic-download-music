@@ -13,8 +13,7 @@ class RunNowCommand(BaseCommand):
         "--ignore-new-playlists-date": {
             "params": {
                 "required": False,
-                "help": "Ignora la fecha de las canciones dentro de una playlist nueva.",
-                "default": True
+                "help": "Ignora la fecha de las canciones dentro de una playlist nueva."
             }
         }
     }
