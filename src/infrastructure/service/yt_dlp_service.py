@@ -60,13 +60,16 @@ ERROR_DETECTORS = [
     detect_no_videos,
 ]
 
-def run_yt_dlp(command: list[str]) -> bool:
+def run_yt_dlp(command: list[str]) -> tuple[bool, bool]:
     """
     Ejecuta yt-dlp usando run_subprocess_with_detectors.
-    Devuelve True si no se detectó ningún error crítico,
-    False si hubo que abortar.
+    Devuelve (success, critical):
+      - success: True si no se detectó ningún error crítico.
+      - critical: True si se detectó un error crítico.
     """
-    output, success, detected_error,returncode = run_subprocess_with_detectors(command, ERROR_DETECTORS)
+    output, (success, critical), detected_error, returncode = run_subprocess_with_detectors(
+        command, ERROR_DETECTORS
+    )
 
     # Opcional: detectar descarga completada desde la salida
     for line in output.splitlines():
@@ -74,7 +77,8 @@ def run_yt_dlp(command: list[str]) -> bool:
             title = line.split("Destination:")[-1].strip() if "Destination:" in line else line
             logger.info(f"🎵 Descargado: {title}")
 
-    return success
+    return success, critical
+
 
 # Cache temporal en memoria para batch
 _batch_cache: Dict[str, Dict] = {}
@@ -102,7 +106,6 @@ def is_url_in_cache(url: str) -> bool:
 def fetch_raw_metadata(url: str) -> Dict | None:
     global _batch_cache, _disk_cache
 
-    
 
     if url in _disk_cache:
         return _disk_cache[url]
@@ -113,12 +116,13 @@ def fetch_raw_metadata(url: str) -> Dict | None:
     if COOKIES_FILE.exists():
         cmd += ["--cookies", str(COOKIES_FILE)]
 
-    output, success, detected_error,returncode = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)
+    output, (success, critical), detected_error,returncode = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)
 
     if not success:
         if detected_error and "Video unavailable" in detected_error:
             _batch_cache[url] = {}
             _disk_cache[url] = {}
+        if critical:
             return None
     
     try:

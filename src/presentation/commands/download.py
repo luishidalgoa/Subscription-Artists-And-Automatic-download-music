@@ -60,7 +60,11 @@ class DownloadCommand(BaseCommand):
                 "-o", temp_output_path, url
         ]
 
-        success = yt_dlp_service.run_yt_dlp(cmd)
+        success, critical = yt_dlp_service.run_yt_dlp(cmd)
+
+        if not success and critical:
+            logger.error("❌ Error crítico en la descarga.")
+            return
 
         files = extract_files(TEMP_MUSIC_PATH)
         files = album_postprocessor.renombrar_con_indice_en(files)

@@ -93,9 +93,9 @@ def run_descargas(new_playlists_download_all: bool = False):
                     cmd.insert(-1, "--dateafter")
                     cmd.insert(-1, since_time[:10].replace('-', ''))
 
-                success = run_yt_dlp(cmd)
+                success, critical = run_yt_dlp(cmd)
 
-                if not success:
+                if not success and critical:
                     logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {artist['name']}.")
                     return
 

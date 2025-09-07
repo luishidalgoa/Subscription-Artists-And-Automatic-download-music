@@ -8,7 +8,7 @@ logger = LoggerProvider()
 def run_subprocess_with_detectors(
     command: List[str],
     detectors: List[Callable[[str, Optional[int]], bool]],
-) -> Tuple[str, bool, Optional[str], int]:
+) -> Tuple[str, Tuple[bool, bool], Optional[str], int]:
     """
     Ejecuta un comando en subprocess y lee línea por línea en streaming.
 
@@ -19,7 +19,9 @@ def run_subprocess_with_detectors(
     Returns:
         (output, success, detected_error, returncode)
           - output: salida completa del proceso (stdout+stderr).
-          - success: True si terminó sin detectar errores críticos.
+          - Tuple (success, critical):
+                - success: True si no se detectó ningún error crítico.
+                - critical: True si el error detectado es crítico y detuvo el proceso.
           - detected_error: la línea que disparó el detector (si aplica).
           - returncode: código de salida del proceso
     """
@@ -34,37 +36,44 @@ def run_subprocess_with_detectors(
     output_lines = []
     detected_error = None
     success = True
+    critical = False
 
-    # 🔹 Leer líneas en streaming y llamar a detectores que dependen solo de líneas
+    # Leer líneas en streaming
     for line in process.stdout:
         line = line.strip()
         if line:
             output_lines.append(line)
             for detector in detectors:
-                detected, critical = detector(line, None)
+                detected, is_critical = detector(line, None)
                 if detected:
                     detected_error = line
-                    if critical:
+                    if is_critical:
                         success = False
+                        critical = True
                         process.terminate()
                         process.wait()
                         break
-            if not success:
+            if critical:
                 break
 
     process.wait()
     returncode = process.returncode
     full_output = "\n".join(output_lines)
 
-    # 🔹 Detectores que dependen del returncode
-    if success:  # solo si no se disparó ninguno antes
+    # Detectores que dependen del returncode
+    if success and not critical:
         for detector in detectors:
-            if detector(full_output, returncode):
+            detected, is_critical = detector(full_output, returncode)
+            if detected:
                 detected_error = full_output
-                success = False
+                if is_critical:
+                    success = False
+                    critical = True
+                else:
+                    success = False
                 break
 
-    # 🔹 Captura errores desconocidos
+    # Captura errores desconocidos
     if returncode != 0 and success:
         logger.error(
             f"⚠️ Comando falló con código {returncode} "
@@ -72,5 +81,5 @@ def run_subprocess_with_detectors(
         )
         raise RuntimeError("Proceso terminado con error")
 
-    return full_output, success, detected_error, returncode
+    return full_output, (success, critical), detected_error, returncode
 
