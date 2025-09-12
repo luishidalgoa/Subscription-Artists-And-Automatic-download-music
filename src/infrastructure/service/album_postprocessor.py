@@ -188,9 +188,12 @@ def actualizar_metadatos_por_defecto(archivo: Union[Path, List[Path]]) -> Union[
             
             # Artist: reemplazar comas por ;
             if "artist" in audio and audio["artist"]:
-                audio["artist"] = audio["artist"].replace(",", ";")
+                artist = "; ".join(audio["artist"])
+                artist = artist.replace(",", ";")
+                audio["artist"] = [artist]
             else:
-                audio["artist"] = f.parent.parent.name if f.parent.parent else "Unknown Artist"
+                artist_name = f.parent.parent.name if f.parent.parent else "Unknown Artist"
+                audio["artist"] = [artist_name]
             
             # Album
             if not audio.get("album"):

@@ -95,7 +95,7 @@ class SchedulerService:
             schedule.clear(job_id)
 
             # Reprogramamos con el intervalo original
-            new_job = schedule.every(timeUnit_to_seconds(job.get_interval(), job.get_time_unit())).seconds.do(self._wrap_job, job_id, job)
+            new_job = schedule.every(Transform.timeUnit_to_seconds(job.get_interval(), job.get_time_unit())).seconds.do(self._wrap_job, job_id, job)
             new_job.tag(job_id)
             
             db_job.is_resumed = False

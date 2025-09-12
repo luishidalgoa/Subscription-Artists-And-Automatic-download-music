@@ -99,4 +99,5 @@ class FetchMetadataCommand(BaseCommand):
                 artist_bar.update()
         else:
             logger.info(f"Procesando solo el artista especificado: {artists_param}")
+            logger.error("Funcionalidad para artista específico no implementada aún.")
             # Aquí iría la lógica para un artista específico
