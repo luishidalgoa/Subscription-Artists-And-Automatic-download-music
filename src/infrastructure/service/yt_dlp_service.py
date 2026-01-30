@@ -112,7 +112,16 @@ def fetch_raw_metadata(url: str) -> Dict | None:
 
     time.sleep(random.uniform(5, 10))
 
-    cmd = ["yt-dlp", "-j", "--skip-download", url]
+    cmd = [
+        "yt-dlp",
+        "-j",
+        "--skip-download",
+        "--js-runtimes", "node",
+        "--extractor-args", "youtube:player_client=android",
+        "--no-warnings",
+        url
+    ]
+
     if COOKIES_FILE.exists():
         cmd += ["--cookies", str(COOKIES_FILE)]
 
@@ -130,15 +139,18 @@ def fetch_raw_metadata(url: str) -> Dict | None:
     except json.JSONDecodeError:
         raise RuntimeError(f"Salida inválida de yt-dlp para {url}")
 
-    artist_str = "; ".join(info.get("artists", [])) if isinstance(info.get("artists"), list) else str(info.get("artist", ""))
+    artist = info.get("artists") or info.get("artist") or []
+    artist_str = "; ".join(artist) if isinstance(artist, list) else str(artist)
+
 
     filtered_info = {
         "id": info.get("id"),
         "title": info.get("title"),
-        "album": info.get("album"),
-        "date": info.get("release_date"),
-        "artist": artist_str
+        "artist": artist_str or None,
+        "album": info.get("album") or None,
+        "date": info.get("release_date") or None
     }
+
 
     _batch_cache[url] = filtered_info
     _disk_cache[url] = filtered_info
