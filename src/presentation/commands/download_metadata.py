@@ -8,15 +8,19 @@ from src.infrastructure.service import album_postprocessor, yt_dlp_service
 from src.infrastructure.utils.progress_bar import ProgressBar
 from src.utils.Transform import Transform
 from src.domain.Metadata import Metadata
-from mutagen.mp4 import MP4
 
 MetadataFields = list(vars(Metadata()).keys())
-
 MetadataFields.remove("Album")
+
 logger = LoggerProvider()
 
+
 class FetchMetadataCommand(BaseCommand):
-    DESCRIPCION = "Extrae metadatos de YouTube usando yt-dlp e inserta campos seleccionados dentro de los archivos de audio existentes."
+    DESCRIPCION = (
+        "Extrae metadatos de YouTube usando yt-dlp e inserta campos "
+        "seleccionados dentro de los archivos de audio existentes."
+    )
+
     ARGUMENTOS = {
         "--tags": {
             "params": {
@@ -42,7 +46,6 @@ class FetchMetadataCommand(BaseCommand):
         }
     }
 
-
     def handle(self, parsed_args):
         tags_to_extract = parsed_args.tags or MetadataFields
         artists_param = parsed_args.artists
@@ -55,48 +58,72 @@ class FetchMetadataCommand(BaseCommand):
             for artist in artists:
                 safe_name = Transform.sanitize_path_component(artist["name"])
                 artist_root = MUSIC_ROOT_PATH / safe_name
+
                 subfolders = obtener_subcarpetas(directorio=artist_root)
 
-                # Recolectamos canciones de todas las subcarpetas
-                all_songs = []
-                for _, ruta in subfolders.items():
-                    all_songs.extend(extract_files(ruta))
+                # 🔹 Cambio: procesamos álbum por álbum en lugar de todas las canciones juntas
+                for album_name, album_path in subfolders.items():
+                    album_songs = extract_files(album_path)
 
-                song_bar = ProgressBar(total=len(all_songs), prefix=f"Canciones {artist['name']}")
-
-                for song in all_songs:
-                    # Progreso de canciones
-                    song_bar.update()
-
-                    ext = str(song).rsplit(".", 1)[-1].lower()
-                    handler = AudioHandlerFactory.get_handler(ext)
-                    if not handler:
-                        logger.warning(f"Formato no soportado: {song}")
+                    if not album_songs:
                         continue
-                    try:
-                        comment = handler.extract_comment(str(song))
-                        if not comment:
-                            logger.warning(f"No hay URL de YouTube en el archivo: {song}")
+
+                    # Barra de progreso por álbum
+                    song_bar = ProgressBar(
+                        total=len(album_songs),
+                        prefix=f"{artist['name']} - {album_name}"
+                    )
+
+                    for song in album_songs:
+                        # Progreso de canciones
+                        song_bar.update()
+
+                        ext = str(song).rsplit(".", 1)[-1].lower()
+                        handler = AudioHandlerFactory.get_handler(ext)
+
+                        if not handler:
+                            logger.warning(f"Formato no soportado: {song}")
                             continue
-                        
-                        if omit_cached:
-                            if yt_dlp_service.is_url_in_cache(comment):
+
+                        try:
+                            comment = handler.extract_comment(str(song))
+                            if not comment:
+                                logger.warning(f"No hay URL de YouTube en el archivo: {song}")
                                 continue
 
-                        raw_metadata = yt_dlp_service.fetch_raw_metadata(comment)
-                        metadata_obj = album_postprocessor.extract_metadata(raw_metadata, tags_to_extract)
+                            if omit_cached and yt_dlp_service.is_url_in_cache(comment):
+                                continue
 
-                        audio = handler.open_file(str(song))
-                        handler.apply_metadata(audio, metadata_obj, tags_to_extract, artist=artist["name"])
-                        audio.save()
+                            raw_metadata = yt_dlp_service.fetch_raw_metadata(comment)
+                            metadata_obj = album_postprocessor.extract_metadata(
+                                raw_metadata,
+                                tags_to_extract
+                            )
 
-                    except Exception as e:
+                            audio = handler.open_file(str(song))
+                            handler.apply_metadata(
+                                audio,
+                                metadata_obj,
+                                tags_to_extract,
+                                artist=artist["name"]
+                            )
+                            audio.save()
+
+                        except Exception as e:
+                            yt_dlp_service.flush_batch_cache()
+                            logger.error(f"Error procesando archivo {song}: {e}")
+
                         yt_dlp_service.flush_batch_cache()
-                        logger.error(f"Error procesando archivo {song}: {e}")
-                    yt_dlp_service.flush_batch_cache()
+
+                    # 🔹 Cambio: actualizamos la portada una sola vez por álbum
+                    album_postprocessor.actualizar_portada(
+                        album_songs,
+                        artist["name"]
+                    )
 
                 # Al terminar el artista → progreso de artistas
                 artist_bar.update()
+
         else:
             logger.info(f"Procesando solo el artista especificado: {artists_param}")
             logger.error("Funcionalidad para artista específico no implementada aún.")

@@ -86,6 +86,7 @@ _disk_cache: Dict[str, Dict] = metadata_cache_load()  # Carga inicial desde json
 
 def save_batch_cache():
     """Guarda en disco las entradas acumuladas en _batch_cache"""
+    # No hacer nada si _batch_cache esta vacio
     global _batch_cache, _disk_cache
     if not _batch_cache:
         return
@@ -101,9 +102,11 @@ def save_batch_cache():
 
 #comprobamos que una url este en la cache
 def is_url_in_cache(url: str) -> bool:
+    """Comprueba si una URL ya está en la caché de disco."""
     return url in _disk_cache
 
 def fetch_raw_metadata(url: str) -> Dict | None:
+    """Obtiene metadatos en bruto de una URL usando yt-dlp, con caché en memoria y disco."""
     global _batch_cache, _disk_cache
 
 
@@ -148,7 +151,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         "title": info.get("title"),
         "artist": artist_str or None,
         "album": info.get("album") or None,
-        "date": info.get("release_date") or None
+        "date": info.get("release_date") or None,
     }
 
 

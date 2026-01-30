@@ -10,6 +10,9 @@ def obtener_subcarpetas(directorio: Path) -> dict[str, Path]:
     return {carpeta.name: carpeta for carpeta in directorio.iterdir() if carpeta.is_dir()}
 
 def extract_files(ruta: Path):
+    """
+    Extrae archivos de música de una ruta dada.
+    """
     songs_files = sorted(
         p for ext in file_music_extension.file_music_extension for p in ruta.glob(f"*{ext}")
     )
