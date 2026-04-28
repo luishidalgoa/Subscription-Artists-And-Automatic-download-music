@@ -12,4 +12,5 @@ services:
       - ./config:/Workspace/config
       - ./data:/Workspace/data
       - ./src:/Workspace/src
+      - ./temp:/Workspace/temp
     restart: unless-stopped

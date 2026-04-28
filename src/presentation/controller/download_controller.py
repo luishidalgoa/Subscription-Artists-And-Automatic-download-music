@@ -15,12 +15,16 @@ from pathlib import Path
 
 def get_artist_playlists(url: str, artist_root: Path):
     """
-    Devuelve la diferencia entre las playlists obtenidas del canal de youtube del artista y las subcarpetas ya existentes.
+    Devuelve playlists nuevas comparando correctamente contra filesystem.
     """
-    # 1️⃣ Obtener subcarpetas existentes
-    subfolders = obtener_subcarpetas(artist_root)  # {nombre_carpeta: Path}
 
-    # 2️⃣ Ejecutar yt-dlp para listar todas las playlists
+    # Carpeta existente real (sanitizada)
+    subfolders = {
+        Transform.sanitize_path_component(p.name): p
+        for p in artist_root.iterdir()
+        if p.is_dir()
+    }
+
     cmd = [
         "yt-dlp",
         "--cookies", str(COOKIES_FILE),
@@ -28,21 +32,34 @@ def get_artist_playlists(url: str, artist_root: Path):
         url
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+
     playlists = []
 
     for line in result.stdout.splitlines():
         try:
             data = json.loads(line)
+
             if data.get("url") and "playlist" in data.get("url", ""):
                 raw_title = data.get("title", f"Playlist_{data['id']}")
-                title = Transform.sanitize_path_component(raw_title)
-                # 3️⃣ Filtrar solo playlists que coinciden con subcarpetas
-                if title not in subfolders:
+
+                safe_title = Transform.sanitize_path_component(raw_title)
+                normalized_title = Transform.normalize_name(raw_title)
+
+                # 🔥 AQUÍ ES DONDE VA TU BLOQUE
+                exists = (
+                    safe_title in subfolders
+                    or normalized_title in {
+                        Transform.normalize_name(k) for k in subfolders
+                    }
+                )
+
+                if not exists:
                     playlists.append({
                         "id": data["id"],
-                        "title": title,
+                        "title": raw_title,
                         "url": data["url"]
                     })
+
         except json.JSONDecodeError:
             logger.warning(f"No se pudo parsear línea de yt-dlp: {line}")
 
@@ -57,22 +74,28 @@ def run_descargas(new_playlists_download_all: bool = False):
         for artist in artists:
             safe_name = Transform.sanitize_path_component(artist["name"])
             url = artist["channel_url"]
+
             logger.info(f"▶ Procesando artista: {artist['name']}")
 
             since_time = last_run.get(artist["name"], now)
+
             output_path = MUSIC_ROOT_PATH / safe_name
             output_path.mkdir(parents=True, exist_ok=True)
 
             playlists = get_artist_playlists(url, output_path)
 
             for pl in playlists:
-                safe_title = Transform.sanitize_path_component(pl["title"])
+                raw_title = pl["title"]  # 👈 NOMBRE REAL del album
+                safe_title = Transform.sanitize_path_component(raw_title)
+                logger.info(f"▶ Procesando playlist: {safe_title}")
+
                 playlist_path = output_path / safe_title
                 is_new = not playlist_path.exists()
-                playlist_path.mkdir(parents=True, exist_ok=True)
-                output_template = str(playlist_path / "%(title)s.%(ext)s")
 
-                # Si la carpeta es nueva y se pasó el flag, no aplicamos --dateafter
+                playlist_path.mkdir(parents=True, exist_ok=True)
+
+                output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
+
                 cmd = [
                     "yt-dlp",
                     "--cookies", str(COOKIES_FILE),
@@ -96,14 +119,16 @@ def run_descargas(new_playlists_download_all: bool = False):
                 success, critical = run_yt_dlp(cmd)
 
                 if not success and critical:
-                    logger.warning(f"⏹ Abortado proceso en playlist {pl['title']} de {artist['name']}.")
+                    logger.warning(
+                        f"⏹ Abortado en playlist {raw_title} de {artist['name']}"
+                    )
                     return
 
             if playlists:
                 logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
                 procesar_albumes(output_path)
             else:
-                logger.warning(f"⚠ No se encontraron playlists para {artist['name']}, saltando.")
+                logger.warning(f"⚠ No se encontraron playlists nuevas para {artist['name']}")
 
             last_run[artist["name"]] = now
 

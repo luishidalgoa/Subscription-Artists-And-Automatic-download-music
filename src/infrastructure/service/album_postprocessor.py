@@ -1,7 +1,8 @@
 # app/service/download_service.py
-import re
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import APIC, ID3, ID3NoHeaderError, error
+from pathlib import Path
+from typing import Union, List
 from src.domain.Metadata import Metadata
 from src.infrastructure.config import file_music_extension
 from src.infrastructure.system.directory_utils import extract_files, obtener_subcarpetas
@@ -58,17 +59,9 @@ def actualizar_portada(songs_files: list[Path], artista: str):
         logger.info(f"[INFO] Portada actualizada en {mp3_file.name}")
 
 
-def renombrar_con_indice_en(songs_files: list[Path]) -> list[Path]:
+def actualizar_indice_pista(songs_files: list[Path]) -> list[Path]:
     renombrados = []
     for i, archivo in enumerate(songs_files, start=1):
-        nombre_limpio = re.sub(r"^\d{2}\. ", "", archivo.name)
-        nuevo_nombre = f"{i:02d}. {nombre_limpio}"
-        nuevo_path = archivo.with_name(nuevo_nombre)
-
-        if archivo != nuevo_path:
-            archivo.rename(nuevo_path)
-            archivo = nuevo_path  # Actualizar referencia
-
         try:
             audio = EasyID3(archivo)
         except ID3NoHeaderError:
@@ -95,49 +88,10 @@ def eliminar_previews(archivos_mp3: list[Path]):
                 logger.error(f"Error al eliminar {archivo.name}: {e}")
 
 
-def mover_a_albumes(artista_path: Path) -> Dict[str, Path]:
-    subcarpetas = [p for p in artista_path.iterdir() if p.is_dir()]
-    rutas_album: Dict[str, Path] = {}
-
-    for carpeta in subcarpetas:
-        songs_files = sorted(carpeta.glob("*.mp3"))
-        if not songs_files:
-            continue
-
-        album = extraer_album(songs_files[0])
-        if not album:
-            continue
-
-        album = album.strip()
-        destino = artista_path / album
-        rutas_album[album] = destino
-
-        if carpeta.name != album:
-            try:
-                # Esto crea la carpeta destino y todas las carpetas padre si no existen
-                destino.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                # Aquí podrías loguear el error o levantarlo si quieres
-                print(f"Error creando carpeta {destino}: {e}")
-                continue  # Salta al siguiente álbum para no detener todo
-
-            for mp3 in songs_files:
-                destino_mp3 = destino / mp3.name
-                if not destino_mp3.exists():
-                    mp3.rename(destino_mp3)
-            if not any(carpeta.iterdir()):
-                carpeta.rmdir()
-
-    return rutas_album
-
-
 
 def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
     options = options or {}
     options["filter_by_date"] = options.get("filter_by_date", True)
-
-
-    mover_a_albumes(artista_path)
 
     time.sleep(2)
     subcarpetas = obtener_subcarpetas(artista_path)
@@ -149,7 +103,7 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
         logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
         if mp3s_a_procesar:
             eliminar_previews(mp3s_a_procesar)
-            mp3s_a_procesar = renombrar_con_indice_en(mp3s_a_procesar)
+            mp3s_a_procesar = actualizar_indice_pista(mp3s_a_procesar)
             mp3s_a_procesar =actualizar_metadatos_por_defecto(mp3s_a_procesar)
             actualizar_portada(mp3s_a_procesar, artista_path.name)
 
@@ -164,13 +118,8 @@ def filtrar_mp3s_por_fecha(songs_files: List[Path], referencia_iso: str, margen_
     return filtrados
 
 
-from pathlib import Path
-from typing import Union, List
-from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3NoHeaderError
-
 def actualizar_metadatos_por_defecto(archivo: Union[Path, List[Path]]) -> Union[Path, List[Path]]:
-    """Actualiza metadatos por defecto en uno o varios archivos MP3. modifica 'albumartist', 'artist' y 'album' si no existen."""
+    """Actualiza metadatos por defecto en uno o varios archivos MP3. modifica 'albumartist', 'artist' y 'album'."""
     archivos = [archivo] if isinstance(archivo, Path) else archivo
 
     for f in archivos:
@@ -195,9 +144,8 @@ def actualizar_metadatos_por_defecto(archivo: Union[Path, List[Path]]) -> Union[
                 artist_name = f.parent.parent.name if f.parent.parent else "Unknown Artist"
                 audio["artist"] = [artist_name]
             
-            # Album
-            if not audio.get("album"):
-                audio["album"] = f.parent.name if f.parent.name else "Unknown Album"
+            # Album: forzar el nombre de la carpeta final, aunque yt-dlp haya escrito otro valor
+            audio["album"] = f.parent.name if f.parent.name else "Unknown Album"
             
             audio.save(f)
         except Exception as e:

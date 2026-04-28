@@ -1,4 +1,7 @@
+import re
+
 from src.domain.scheduler.time_unit import TimeUnit
+import unicodedata
 
 class Transform:
     def timeUnit_to_seconds(value: int, unit: TimeUnit) -> int:
@@ -50,10 +53,46 @@ class Transform:
             return date_str
 
 
+    @staticmethod
     def sanitize_path_component(name: str) -> str:
         """
-        Sustituye:
-        - '/' y '\' por '_' para evitar crear subcarpetas.
-        - '"' por "'" para evitar problemas en nombres de archivo/carpeta.
+        Limpia nombres para filesystem sin deformarlos demasiado.
         """
-        return name.replace("/", "_").replace("\\", "_").replace('"', "'")
+        if not name:
+            return "Unknown"
+
+        # Normalizar unicode (quita rarezas invisibles)
+        name = unicodedata.normalize("NFKC", name)
+
+        # Sustitucciones básicas
+        name = name.replace("/", "_").replace("\\", "_")
+        name = name.replace('"', "'")
+
+        # Quitar caracteres ilegales en sistemas de archivos
+        name = re.sub(r'[<>:*?|]', '', name)
+
+        # Espacios limpios
+        name = re.sub(r"\s+", " ", name).strip()
+
+        return name
+
+    @staticmethod
+    def normalize_name(name: str) -> str:
+        """
+        Normaliza nombres para comparar:
+        - minúsculas
+        - sin acentos
+        - sin símbolos raros
+        - espacios unificados
+        """
+        name = name.lower()
+
+        name = unicodedata.normalize("NFKD", name)
+        name = "".join(c for c in name if not unicodedata.combining(c))
+
+        name = re.sub(r"[^\w\s]", "", name)
+        name = re.sub(r"\s+", " ", name).strip()
+
+        return name
+
+    
