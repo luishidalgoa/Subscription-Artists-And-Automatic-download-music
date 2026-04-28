@@ -4,13 +4,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    user: "1000:1000"
     environment:
       - TZ=Europe/Madrid
       - YT_COMMAND=boot
     volumes:
-      - ./output:/music
+      - /mnt/nextcloud_hdd_1/Navidrome/music:/music
       - ./config:/Workspace/config
       - ./data:/Workspace/data
       - ./src:/Workspace/src
-      - ./temp:/Workspace/temp
+      - /mnt/nextcloud_hdd_1/Navidrome/temp:/Workspace/temp
     restart: unless-stopped
