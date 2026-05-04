@@ -133,6 +133,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
     ]
 
     if COOKIES_FILE.exists():
+        logger.info("Se están usando cookies")
         cmd += ["--cookies", str(COOKIES_FILE)]
 
     output, (success, critical), detected_error,returncode = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)
