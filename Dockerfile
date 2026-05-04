@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     tzdata \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- yt-dlp (version fija reproducible) ----
