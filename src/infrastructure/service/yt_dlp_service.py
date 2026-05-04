@@ -53,11 +53,17 @@ def detect_no_videos(line: str, returncode: int) -> bool:
         return True, False
     return False, False
 
+def detect_js_error(line: str, returncode: int) -> Tuple[bool, bool]:
+    if "Signature solving failed" in line or "n challenge solving failed" in line:
+        logger.error("❌ Fallo crítico de JavaScript. yt-dlp no pudo descifrar la firma.")
+        return True, True # Es crítico porque no bajará nada
+    return False, False
 
 ERROR_DETECTORS = [
     detect_ip_ban,
     detect_video_unavailable,
     detect_no_videos,
+    detect_js_error,
 ]
 
 def run_yt_dlp(command: list[str]) -> tuple[bool, bool]:
@@ -122,10 +128,12 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         "--js-runtimes", "node",
         "--extractor-args", "youtube:player_client=android",
         "--no-warnings",
+        "--check-formats",
         url
     ]
 
     if COOKIES_FILE.exists():
+        logger.info("Se están usando cookies")
         cmd += ["--cookies", str(COOKIES_FILE)]
 
     output, (success, critical), detected_error,returncode = run_subprocess_with_detectors(cmd, ERROR_DETECTORS)

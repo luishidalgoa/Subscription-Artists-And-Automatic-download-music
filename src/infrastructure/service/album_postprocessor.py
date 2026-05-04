@@ -100,8 +100,8 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
         songs_files = extract_files(ruta)
 
         mp3s_a_procesar = filtrar_mp3s_por_fecha(songs_files, now, margen_minutos=5) if options["filter_by_date"] else songs_files
-        logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
         if mp3s_a_procesar:
+            logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
             eliminar_previews(mp3s_a_procesar)
             mp3s_a_procesar = actualizar_indice_pista(mp3s_a_procesar)
             mp3s_a_procesar =actualizar_metadatos_por_defecto(mp3s_a_procesar)
