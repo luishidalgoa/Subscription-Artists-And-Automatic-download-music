@@ -53,11 +53,17 @@ def detect_no_videos(line: str, returncode: int) -> bool:
         return True, False
     return False, False
 
+def detect_js_error(line: str, returncode: int) -> Tuple[bool, bool]:
+    if "Signature solving failed" in line or "n challenge solving failed" in line:
+        logger.error("❌ Fallo crítico de JavaScript. yt-dlp no pudo descifrar la firma.")
+        return True, True # Es crítico porque no bajará nada
+    return False, False
 
 ERROR_DETECTORS = [
     detect_ip_ban,
     detect_video_unavailable,
     detect_no_videos,
+    detect_js_error,
 ]
 
 def run_yt_dlp(command: list[str]) -> tuple[bool, bool]:
