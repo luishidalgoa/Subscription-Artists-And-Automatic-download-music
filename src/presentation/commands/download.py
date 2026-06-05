@@ -72,6 +72,7 @@ class DownloadCommand(BaseCommand):
             "--js-runtimes", "node",   # sin runtime JS, YouTube limita ("rate-limited")
             "--no-warnings",           # silencia warnings benignos del challenge JS
             "--quiet",
+            "--print", yt_dlp_service.PROGRESS_PRINT,  # progreso por canción (run_yt_dlp lo pinta)
             "--extract-audio",
             "--audio-format", "mp3",
             "--no-overwrites",

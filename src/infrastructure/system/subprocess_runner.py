@@ -8,6 +8,7 @@ logger = LoggerProvider()
 def run_subprocess_with_detectors(
     command: List[str],
     detectors: List[Callable[[str, Optional[int]], bool]],
+    line_callback: Optional[Callable[[str], None]] = None,
 ) -> Tuple[str, Tuple[bool, bool], Optional[str], int]:
     """
     Ejecuta un comando en subprocess y lee línea por línea en streaming.
@@ -42,6 +43,11 @@ def run_subprocess_with_detectors(
     for line in process.stdout:
         line = line.strip()
         if line:
+            if line_callback:
+                try:
+                    line_callback(line)
+                except Exception:
+                    pass  # el render nunca debe tumbar la descarga
             output_lines.append(line)
             for detector in detectors:
                 detected, is_critical = detector(line, None)

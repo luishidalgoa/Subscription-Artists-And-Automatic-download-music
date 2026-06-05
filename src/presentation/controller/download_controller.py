@@ -11,7 +11,7 @@ from src.utils.Transform import Transform
 logger = LoggerProvider()
 from src.infrastructure.config.config import COOKIES_FILE
 from src.infrastructure.config import config as app_config
-from src.infrastructure.service.yt_dlp_service import run_yt_dlp
+from src.infrastructure.service.yt_dlp_service import run_yt_dlp, PROGRESS_PRINT
 from src.infrastructure.system.directory_utils import obtener_subcarpetas
 from pathlib import Path
 
@@ -293,6 +293,8 @@ def run_descargas(new_playlists_download_all: bool = False):
                         # failed" (el audio se baja igual). Los ERRORES siguen visibles.
                         "--no-warnings",
                         "--quiet",
+                        # Progreso: una línea por canción (la pinta run_yt_dlp con \r).
+                        "--print", PROGRESS_PRINT,
                         "--extract-audio",
                         "--audio-format", "mp3",
                         "--no-overwrites",

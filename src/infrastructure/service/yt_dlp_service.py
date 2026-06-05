@@ -2,6 +2,8 @@
 from typing import Tuple, Optional, Callable, List, Dict
 import json
 import random
+import shutil
+import sys
 import time
 from typing import Dict
 from src.application.providers.logger_provider import LoggerProvider
@@ -69,6 +71,64 @@ ERROR_DETECTORS = [
     detect_js_error,
 ]
 
+# Separador (Unit Separator, 0x1f) que usa el template --print de yt-dlp: nunca aparece
+# en títulos/álbumes, así que distingue las líneas de progreso del resto de la salida.
+PROGRESS_SEP = "\x1f"
+# Template para --print "before_dl:...": emite "<sep><álbum><sep><título>" por canción.
+# album cae a playlist_title (releases) y por defecto a "Sin álbum".
+PROGRESS_PRINT = f"before_dl:{PROGRESS_SEP}%(album,playlist_title|Sin álbum)s{PROGRESS_SEP}%(title)s"
+
+
+def _progress_renderer():
+    """Devuelve un callback por línea que pinta el progreso de descarga.
+
+    - En terminal (TTY): una sola línea por canción que se reescribe con `\\r`, y salto
+      de línea al cambiar de álbum → la consola no se ensucia de infos.
+    - Sin TTY (scheduler / `docker logs`): solo loguea la cabecera de cada álbum.
+    """
+    try:
+        is_tty = sys.stdout.isatty()
+    except Exception:
+        is_tty = False
+    state = {"album": None, "n": 0}
+
+    def render(line: str):
+        if not line.startswith(PROGRESS_SEP):
+            return
+        parts = line.split(PROGRESS_SEP)
+        if len(parts) < 3:
+            return
+        album, title = parts[1], parts[2]
+        if album != state["album"]:
+            if is_tty and state["album"] is not None:
+                sys.stdout.write("\n")          # cierra la línea del álbum anterior
+            state["album"] = album
+            state["n"] = 0
+            if is_tty:
+                sys.stdout.write(f"💿 {album}\n")
+                sys.stdout.flush()
+            else:
+                logger.info(f"💿 Álbum: {album}")
+        state["n"] += 1
+        if is_tty:
+            try:
+                width = shutil.get_terminal_size((100, 20)).columns
+            except Exception:
+                width = 100
+            txt = f"  ⬇ {state['n']:02d}. {title}"
+            # recorta y rellena para borrar el resto de la canción anterior
+            sys.stdout.write("\r" + txt[: width - 1].ljust(width - 1))
+            sys.stdout.flush()
+
+    def finish():
+        if is_tty and state["album"] is not None:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
+    render.finish = finish
+    return render
+
+
 def run_yt_dlp(command: list[str]) -> tuple[bool, bool]:
     """
     Ejecuta yt-dlp usando run_subprocess_with_detectors.
@@ -76,15 +136,11 @@ def run_yt_dlp(command: list[str]) -> tuple[bool, bool]:
       - success: True si no se detectó ningún error crítico.
       - critical: True si se detectó un error crítico.
     """
+    render = _progress_renderer()
     output, (success, critical), detected_error, returncode = run_subprocess_with_detectors(
-        command, ERROR_DETECTORS
+        command, ERROR_DETECTORS, line_callback=render
     )
-
-    # Opcional: detectar descarga completada desde la salida
-    for line in output.splitlines():
-        if line.startswith("[ExtractAudio] Destination:") or "has already been downloaded" in line:
-            title = line.split("Destination:")[-1].strip() if "Destination:" in line else line
-            logger.info(f"🎵 Descargado: {title}")
+    render.finish()
 
     return success, critical
 
