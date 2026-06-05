@@ -8,7 +8,8 @@ import os
 from src.application.providers.logger_provider import LoggerProvider
 from src.utils.Transform import Transform
 logger = LoggerProvider()
-from src.infrastructure.config.config import now,COOKIES_FILE
+from src.infrastructure.config.config import COOKIES_FILE
+from src.infrastructure.config import config as app_config
 from src.infrastructure.service.yt_dlp_service import run_yt_dlp
 from src.infrastructure.system.directory_utils import obtener_subcarpetas
 from pathlib import Path
@@ -64,7 +65,11 @@ def _flat_dump(url: str) -> dict | None:
         "-J", "--flat-playlist",
         url,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        logger.warning(f"yt-dlp tardó demasiado (timeout) al listar {url}")
+        return None
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -157,88 +162,122 @@ def get_artist_playlists(url: str, artist_root: Path):
     return []
 
 
-def run_descargas(new_playlists_download_all: bool = False):
+def _save_last_run(last_run: dict) -> None:
+    """Persiste last_run.json de forma atómica (escritura + fsync). No relanza errores."""
     try:
-        artists = artists_load()
-        last_run = last_run_load()
-
-        for artist in artists:
-            safe_name = Transform.sanitize_path_component(artist["name"])
-            url = artist["channel_url"]
-
-            logger.info(f"▶ Procesando artista: {artist['name']}")
-
-            since_time = last_run.get(artist["name"], now)
-
-            output_path = MUSIC_ROOT_PATH / safe_name
-            output_path.mkdir(parents=True, exist_ok=True)
-
-            playlists = get_artist_playlists(url, output_path)
-
-            for pl in playlists:
-                raw_title = pl["title"]  # 👈 NOMBRE REAL del album
-                safe_title = Transform.sanitize_path_component(raw_title)
-
-                if pl.get("split_by_album"):
-                    # Canal Topic: una carpeta por álbum (yt-dlp reparte con %(album)s).
-                    # Sin track_number fiable en estos canales; el post-proceso reindexa.
-                    logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
-                    is_new = not any(p.is_dir() for p in output_path.iterdir())
-                    output_template = str(
-                        output_path / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
-                    )
-                else:
-                    logger.info(f"▶ Procesando playlist: {safe_title}")
-
-                    playlist_path = output_path / safe_title
-                    is_new = not playlist_path.exists()
-
-                    playlist_path.mkdir(parents=True, exist_ok=True)
-
-                    output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
-
-                cmd = [
-                    "yt-dlp",
-                    "--cookies", str(COOKIES_FILE),
-                    "--quiet",
-                    "--extract-audio",
-                    "--audio-format", "mp3",
-                    "--no-overwrites",
-                    "--add-metadata",
-                    "--embed-thumbnail",
-                    "--sleep-interval", "5",
-                    "--max-sleep-interval", "10",
-                    "--break-on-reject",
-                    "-o", output_template,
-                    pl["url"]
-                ]
-
-                if not (is_new and new_playlists_download_all):
-                    cmd.insert(-1, "--dateafter")
-                    cmd.insert(-1, since_time[:10].replace('-', ''))
-
-                success, critical = run_yt_dlp(cmd)
-
-                if not success and critical:
-                    logger.warning(
-                        f"⏹ Abortado en playlist {raw_title} de {artist['name']}"
-                    )
-                    return
-
-            if playlists:
-                logger.info(f"  ↳ Descarga completada para {artist['name']}. Procesando álbumes...")
-                procesar_albumes(output_path)
-            else:
-                logger.warning(f"⚠ No se encontraron playlists nuevas para {artist['name']}")
-
-            last_run[artist["name"]] = now
-
         with LAST_RUN_FILE.open("w") as f:
             json.dump(last_run, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
+    except Exception as e:
+        logger.error(f"No se pudo guardar last_run.json: {e}")
 
+
+def run_descargas(new_playlists_download_all: bool = False):
+    # artists_load/last_run_load degradan a [] / {} ante error → no revientan el bucle.
+    artists = artists_load() or []
+    last_run = last_run_load() or {}
+    # Timestamp FRESCO de esta ejecución (app_config.now se refresca en update_now());
+    # leerlo del módulo evita el valor congelado en el import.
+    run_ts = app_config.now
+
+    try:
+        for artist in artists:
+            name = (artist or {}).get("name")
+            url = (artist or {}).get("channel_url")
+            if not name or not url:
+                logger.warning(f"⚠ Artista inválido en artists.json, se omite: {artist!r}")
+                continue
+
+            try:
+                logger.info(f"▶ Procesando artista: {name}")
+                safe_name = Transform.sanitize_path_component(name)
+                since_time = last_run.get(name, run_ts)
+
+                output_path = MUSIC_ROOT_PATH / safe_name
+                output_path.mkdir(parents=True, exist_ok=True)
+
+                playlists = get_artist_playlists(url, output_path)
+
+                stop_all = False
+                for pl in playlists:
+                    raw_title = pl["title"]  # 👈 NOMBRE REAL del album
+                    safe_title = Transform.sanitize_path_component(raw_title)
+
+                    if pl.get("split_by_album"):
+                        # Canal Topic: una carpeta por álbum (yt-dlp reparte con %(album)s).
+                        # Sin track_number fiable en estos canales; el post-proceso reindexa.
+                        logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
+                        is_new = not any(p.is_dir() for p in output_path.iterdir())
+                        output_template = str(
+                            output_path / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
+                        )
+                    else:
+                        logger.info(f"▶ Procesando playlist: {safe_title}")
+
+                        playlist_path = output_path / safe_title
+                        is_new = not playlist_path.exists()
+
+                        playlist_path.mkdir(parents=True, exist_ok=True)
+
+                        output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
+
+                    cmd = [
+                        "yt-dlp",
+                        "--cookies", str(COOKIES_FILE),
+                        "--quiet",
+                        "--extract-audio",
+                        "--audio-format", "mp3",
+                        "--no-overwrites",
+                        "--add-metadata",
+                        "--embed-thumbnail",
+                        "--sleep-interval", "5",
+                        "--max-sleep-interval", "10",
+                        "--break-on-reject",
+                        "-o", output_template,
+                        pl["url"]
+                    ]
+
+                    if not (is_new and new_playlists_download_all):
+                        cmd.insert(-1, "--dateafter")
+                        cmd.insert(-1, since_time[:10].replace('-', ''))
+
+                    success, critical = run_yt_dlp(cmd)
+
+                    if not success and critical:
+                        logger.warning(
+                            f"⏹ Abortado en playlist {raw_title} de {name}: error crítico"
+                        )
+                        stop_all = True
+                        break
+
+                if stop_all:
+                    # Error crítico (p.ej. bloqueo de IP): detener TODO el run, pero
+                    # conservando el progreso de los artistas ya completados. Este
+                    # artista NO se marca como completado (se reintentará).
+                    _save_last_run(last_run)
+                    logger.error("🛑 Run detenido por error crítico (posible bloqueo de IP). Progreso guardado.")
+                    return
+
+                if playlists:
+                    logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
+                    procesar_albumes(output_path)
+                else:
+                    logger.warning(f"⚠ No se encontraron playlists nuevas para {name}")
+
+                # Solo se marca completado si llegó hasta aquí sin abortar.
+                last_run[name] = run_ts
+                _save_last_run(last_run)  # persistencia incremental: no perder progreso
+
+            except Exception as e:
+                # Aísla el fallo de un artista para no tumbar el resto del lote
+                # (p.ej. RuntimeError de yt-dlp por un exit code no reconocido).
+                logger.error(f"❌ Error procesando '{name}', se omite y se continúa: {e}")
+                continue
+
+        _save_last_run(last_run)
         logger.info("✅ Proceso completado.")
 
     except KeyboardInterrupt:
-        logger.error("❌ Descarga interrumpida manualmente por el usuario. Todos los procesos activos se detuvieron.")
+        logger.error("❌ Descarga interrumpida manualmente por el usuario. Guardando progreso...")
+        _save_last_run(last_run)

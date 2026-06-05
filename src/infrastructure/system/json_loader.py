@@ -5,26 +5,29 @@ from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, METADA
 
 logger = LoggerProvider()
 def artists_load():
+    # Devuelve SIEMPRE una lista (vacía ante error/ausencia) para que los bucles
+    # `for artist in artists` no revienten con None o con un tipo inesperado.
     if ARTISTS_FILE.exists():
         try:
             with ARTISTS_FILE.open() as f:
                 artists = json.load(f)
-                return artists
+                return artists if isinstance(artists, list) else []
         except Exception as e:
             logger.error(f"Error al leer artists.json: {e}")
-            return
+            return []
     else:
-        return {}
+        return []
 
 def last_run_load():
+    # Devuelve SIEMPRE un dict (vacío ante error/ausencia) para poder hacer .get().
     if LAST_RUN_FILE.exists():
         try:
             with LAST_RUN_FILE.open() as f:
                 last_run = json.load(f)
-                return last_run
+                return last_run if isinstance(last_run, dict) else {}
         except Exception as e:
             logger.error(f"Error al leer last_run.json: {e}")
-            return
+            return {}
     else:
         return {}
 

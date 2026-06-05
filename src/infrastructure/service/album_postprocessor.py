@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 import time
-from src.infrastructure.config.config import now
+from src.infrastructure.config import config as app_config
 from src.application.providers.logger_provider import LoggerProvider
 from src.utils.audio_utils import extraer_album, obtener_portada_album
 
@@ -99,7 +99,7 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
     for _, ruta in subcarpetas.items():
         songs_files = extract_files(ruta)
 
-        mp3s_a_procesar = filtrar_mp3s_por_fecha(songs_files, now, margen_minutos=5) if options["filter_by_date"] else songs_files
+        mp3s_a_procesar = filtrar_mp3s_por_fecha(songs_files, app_config.now, margen_minutos=5) if options["filter_by_date"] else songs_files
         if mp3s_a_procesar:
             logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
             eliminar_previews(mp3s_a_procesar)
