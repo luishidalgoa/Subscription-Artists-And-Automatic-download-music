@@ -70,6 +70,7 @@ class DownloadCommand(BaseCommand):
             "yt-dlp",
             "--cookies", str(COOKIES_FILE),
             "--js-runtimes", "node",   # sin runtime JS, YouTube limita ("rate-limited")
+            "--no-warnings",           # silencia warnings benignos del challenge JS
             "--quiet",
             "--extract-audio",
             "--audio-format", "mp3",

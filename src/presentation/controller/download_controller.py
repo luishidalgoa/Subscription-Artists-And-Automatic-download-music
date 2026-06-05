@@ -289,6 +289,9 @@ def run_descargas(new_playlists_download_all: bool = False):
                         # Sin un runtime JS, yt-dlp cae al cliente web y YouTube lo limita
                         # ("Video unavailable... rate-limited"). node va instalado en la imagen.
                         "--js-runtimes", "node",
+                        # Silencia los warnings benignos de "Signature/n challenge solving
+                        # failed" (el audio se baja igual). Los ERRORES siguen visibles.
+                        "--no-warnings",
                         "--quiet",
                         "--extract-audio",
                         "--audio-format", "mp3",

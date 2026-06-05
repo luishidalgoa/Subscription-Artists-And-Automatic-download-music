@@ -54,9 +54,12 @@ def detect_no_videos(line: str, returncode: int) -> bool:
     return False, False
 
 def detect_js_error(line: str, returncode: int) -> Tuple[bool, bool]:
+    # NO es crítico: son advertencias de yt-dlp al no resolver el challenge JS de YouTube
+    # (falta el solver EJS). Para AUDIO (opus/m4a) la descarga funciona igual — verificado.
+    # Antes se marcaba crítico y abortaba TODO el run en la primera pista.
     if "Signature solving failed" in line or "n challenge solving failed" in line:
-        logger.error("❌ Fallo crítico de JavaScript. yt-dlp no pudo descifrar la firma.")
-        return True, True # Es crítico porque no bajará nada
+        logger.warning("⚠️ yt-dlp no resolvió el challenge JS (pueden faltar formatos de vídeo; el audio se baja igual).")
+        return True, False
     return False, False
 
 ERROR_DETECTORS = [
