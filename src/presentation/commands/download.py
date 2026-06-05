@@ -1,6 +1,4 @@
 import json
-from os import mkdir
-from re import A
 import shutil
 import subprocess
 from src.application.providers.logger_provider import LoggerProvider
@@ -55,10 +53,15 @@ class DownloadCommand(BaseCommand):
                 url
             ]
 
-            result = subprocess.run(cmd_info, capture_output=True, text=True)
-            data = json.loads(result.stdout)
-
-            playlist_title = data.get("title")
+            try:
+                result = subprocess.run(cmd_info, capture_output=True, text=True, timeout=120)
+                data = json.loads(result.stdout)
+                playlist_title = data.get("title")
+            except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+                logger.warning(
+                    f"No se pudo obtener el título de la playlist ({e}); se usará el álbum de cada pista."
+                )
+                playlist_title = None
 
         temp_output_path = str(TEMP_MUSIC_PATH / "%(autonumber)02d. %(title)s.%(ext)s")
 

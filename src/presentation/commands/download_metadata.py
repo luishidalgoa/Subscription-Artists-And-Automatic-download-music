@@ -49,10 +49,20 @@ class FetchMetadataCommand(BaseCommand):
     def handle(self, parsed_args):
         tags_to_extract = parsed_args.tags or MetadataFields
         artists_param = parsed_args.artists
-        omit_cached = parsed_args.omit or True
+        # --omit (default True): omite URLs ya cacheadas. Antes `or True` lo forzaba a
+        # True siempre; ahora se puede desactivar con --omit false/0/no.
+        omit_cached = str(getattr(parsed_args, "omit", True)).strip().lower() not in ("false", "0", "no", "off")
 
-        if artists_param == "All" or not artists_param:
-            artists = artists_load()
+        artists = artists_load()
+        if artists_param and artists_param != "All":
+            target = artists_param.strip("'\"")
+            artists = [a for a in artists if a["name"].casefold() == target.casefold()]
+            if not artists:
+                logger.error(f"No se encontró el artista '{target}' en artists.json.")
+                return
+            logger.info(f"Procesando solo el artista: {target}")
+
+        if artists:
             artist_bar = ProgressBar(total=len(artists), prefix="Artistas")
 
             for artist in artists:
@@ -123,8 +133,3 @@ class FetchMetadataCommand(BaseCommand):
 
                 # Al terminar el artista → progreso de artistas
                 artist_bar.update()
-
-        else:
-            logger.info(f"Procesando solo el artista especificado: {artists_param}")
-            logger.error("Funcionalidad para artista específico no implementada aún.")
-            # Aquí iría la lógica para un artista específico
