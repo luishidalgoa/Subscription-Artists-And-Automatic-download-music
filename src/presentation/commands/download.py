@@ -49,6 +49,7 @@ class DownloadCommand(BaseCommand):
             cmd_info = [
                 "yt-dlp",
                 "--cookies", str(COOKIES_FILE),
+                "--js-runtimes", "node",
                 "--dump-single-json",
                 url
             ]
@@ -68,6 +69,7 @@ class DownloadCommand(BaseCommand):
         cmd = [
             "yt-dlp",
             "--cookies", str(COOKIES_FILE),
+            "--js-runtimes", "node",   # sin runtime JS, YouTube limita ("rate-limited")
             "--quiet",
             "--extract-audio",
             "--audio-format", "mp3",
