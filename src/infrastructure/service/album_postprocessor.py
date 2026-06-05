@@ -89,7 +89,36 @@ def eliminar_previews(archivos_mp3: list[Path]):
 
 
 
+def procesar_album(album_path: Path, options: Optional[dict] = None):
+    """Post-procesa UN álbum (una carpeta): previews, índice de pista, metadatos y portada.
+
+    Pensado para invocarse en cuanto un álbum termina de descargarse (no al final del
+    artista). Con `filter_by_date` (por defecto True) solo toca los archivos recién bajados.
+    """
+    options = options or {}
+    options["filter_by_date"] = options.get("filter_by_date", True)
+
+    songs_files = extract_files(album_path)
+    if not songs_files:
+        return
+
+    mp3s_a_procesar = (
+        filtrar_mp3s_por_fecha(songs_files, app_config.now, margen_minutos=5)
+        if options["filter_by_date"] else songs_files
+    )
+    if not mp3s_a_procesar:
+        return
+
+    logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {album_path}")
+    eliminar_previews(mp3s_a_procesar)
+    mp3s_a_procesar = actualizar_indice_pista(mp3s_a_procesar)
+    mp3s_a_procesar = actualizar_metadatos_por_defecto(mp3s_a_procesar)
+    # El artista es la carpeta padre del álbum.
+    actualizar_portada(mp3s_a_procesar, album_path.parent.name)
+
+
 def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
+    """Post-procesa TODOS los álbumes de un artista (delegando en procesar_album)."""
     options = options or {}
     options["filter_by_date"] = options.get("filter_by_date", True)
 
@@ -97,15 +126,7 @@ def procesar_albumes(artista_path: Path, options: Optional[dict]=None):
     subcarpetas = obtener_subcarpetas(artista_path)
 
     for _, ruta in subcarpetas.items():
-        songs_files = extract_files(ruta)
-
-        mp3s_a_procesar = filtrar_mp3s_por_fecha(songs_files, app_config.now, margen_minutos=5) if options["filter_by_date"] else songs_files
-        if mp3s_a_procesar:
-            logger.info(f"🎵 Procesando {len(mp3s_a_procesar)} songs_files en {ruta}")
-            eliminar_previews(mp3s_a_procesar)
-            mp3s_a_procesar = actualizar_indice_pista(mp3s_a_procesar)
-            mp3s_a_procesar =actualizar_metadatos_por_defecto(mp3s_a_procesar)
-            actualizar_portada(mp3s_a_procesar, artista_path.name)
+        procesar_album(ruta, options)
 
 def filtrar_mp3s_por_fecha(songs_files: List[Path], referencia_iso: str, margen_minutos: int = 5) -> List[Path]:
     referencia_dt = datetime.fromisoformat(referencia_iso).replace(tzinfo=timezone.utc)

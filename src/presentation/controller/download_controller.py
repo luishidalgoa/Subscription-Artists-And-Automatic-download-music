@@ -3,7 +3,7 @@ import json
 import subprocess
 from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, MUSIC_ROOT_PATH
 from src.infrastructure.system.json_loader import artists_load, last_run_load
-from src.infrastructure.service.album_postprocessor import procesar_albumes
+from src.infrastructure.service.album_postprocessor import procesar_album
 import os
 from src.application.providers.logger_provider import LoggerProvider
 from src.utils.Transform import Transform
@@ -200,6 +200,7 @@ def run_descargas(new_playlists_download_all: bool = False):
                 playlists = get_artist_playlists(url, output_path)
 
                 stop_all = False
+                processed_albums: set = set()  # P2: evita re-procesar el mismo álbum en este run
                 for pl in playlists:
                     raw_title = pl["title"]  # 👈 NOMBRE REAL del album
                     safe_title = Transform.sanitize_path_component(raw_title)
@@ -251,6 +252,18 @@ def run_descargas(new_playlists_download_all: bool = False):
                         stop_all = True
                         break
 
+                    # P2: post-procesar metadatos EN CUANTO el álbum termina, sin esperar
+                    # a que acabe el artista completo. En modo Topic una sola invocación
+                    # crea varias carpetas de álbum → se procesan las nuevas/recién tocadas.
+                    if pl.get("split_by_album"):
+                        for sub in obtener_subcarpetas(output_path).values():
+                            if sub not in processed_albums:
+                                procesar_album(sub)
+                                processed_albums.add(sub)
+                    else:
+                        procesar_album(playlist_path)
+                        processed_albums.add(playlist_path)
+
                 if stop_all:
                     # Error crítico (p.ej. bloqueo de IP): detener TODO el run, pero
                     # conservando el progreso de los artistas ya completados. Este
@@ -260,8 +273,8 @@ def run_descargas(new_playlists_download_all: bool = False):
                     return
 
                 if playlists:
-                    logger.info(f"  ↳ Descarga completada para {name}. Procesando álbumes...")
-                    procesar_albumes(output_path)
+                    # El post-proceso ya se hizo álbum a álbum durante la descarga (P2).
+                    logger.info(f"  ↳ Descarga y post-proceso completados para {name}.")
                 else:
                     logger.warning(f"⚠ No se encontraron playlists nuevas para {name}")
 
