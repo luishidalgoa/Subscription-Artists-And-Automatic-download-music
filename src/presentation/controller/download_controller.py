@@ -1,10 +1,11 @@
 # app/controller/download_controller.py
 import json
 import subprocess
-from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, MUSIC_ROOT_PATH
+from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, MUSIC_ROOT_PATH, TEMP_MUSIC_PATH
 from src.infrastructure.system.json_loader import artists_load, last_run_load
 from src.infrastructure.service.album_postprocessor import procesar_album
 import os
+import shutil
 from src.application.providers.logger_provider import LoggerProvider
 from src.utils.Transform import Transform
 logger = LoggerProvider()
@@ -173,6 +174,60 @@ def _save_last_run(last_run: dict) -> None:
         logger.error(f"No se pudo guardar last_run.json: {e}")
 
 
+def _existing_album_match_filter(music_artist_dir: Path) -> list:
+    """`--match-filter` que EXCLUYE de la descarga los álbumes ya presentes en /music.
+
+    Usa igualdad exacta (`album!=...`) para no excluir por subcadena (evita perder un
+    álbum nuevo cuyo nombre contenga al de uno existente). Solo incluye nombres seguros
+    para el parser de yt-dlp (sin `&` ni comillas); los demás los atrapa el chequeo
+    autoritativo al mover, sin pérdida de datos. Devuelve [] si no hay nada que excluir.
+    """
+    if not music_artist_dir.exists():
+        return []
+    safe = [
+        p.name for p in music_artist_dir.iterdir()
+        if p.is_dir() and all(c not in p.name for c in ('&', '"', '\n'))
+    ]
+    if not safe:
+        return []
+    expr = " & ".join(f"album!={n}" for n in safe)
+    return ["--match-filter", expr]
+
+
+def _promote_album(temp_album: Path, music_artist_dir: Path) -> None:
+    """Post-procesa un álbum descargado en TEMP y lo MUEVE a /music/<artista> si es nuevo.
+
+    Reusa _is_already_downloaded: si el álbum ya existe en destino, descarta la copia
+    temporal (no duplica ni sobrescribe). El post-proceso (P2) se hace en TEMP antes de mover.
+    """
+    if not temp_album.is_dir():
+        return
+    if not any(temp_album.iterdir()):
+        shutil.rmtree(temp_album, ignore_errors=True)
+        return
+
+    music_subfolders = {
+        Transform.sanitize_path_component(p.name): p
+        for p in music_artist_dir.iterdir() if p.is_dir()
+    } if music_artist_dir.exists() else {}
+
+    if _is_already_downloaded(temp_album.name, music_subfolders):
+        logger.info(f"⏭ Álbum ya presente en /music, se descarta el temporal: {temp_album.name}")
+        shutil.rmtree(temp_album, ignore_errors=True)
+        return
+
+    # Post-proceso EN TEMP (todo lo de temp es recién bajado → sin filtro por fecha).
+    procesar_album(temp_album, {"filter_by_date": False})
+
+    music_artist_dir.mkdir(parents=True, exist_ok=True)
+    dest = music_artist_dir / temp_album.name
+    if dest.exists():
+        shutil.rmtree(temp_album, ignore_errors=True)
+        return
+    shutil.move(str(temp_album), str(dest))
+    logger.info(f"📦 Álbum movido a /music: {dest.name}")
+
+
 def run_descargas(new_playlists_download_all: bool = False):
     # artists_load/last_run_load degradan a [] / {} ante error → no revientan el bucle.
     artists = artists_load() or []
@@ -189,9 +244,10 @@ def run_descargas(new_playlists_download_all: bool = False):
                 logger.warning(f"⚠ Artista inválido en artists.json, se omite: {artist!r}")
                 continue
 
+            safe_name = Transform.sanitize_path_component(name)
+            temp_artist_dir = TEMP_MUSIC_PATH / safe_name  # descargas en curso, aisladas por artista
             try:
                 logger.info(f"▶ Procesando artista: {name}")
-                safe_name = Transform.sanitize_path_component(name)
                 since_time = last_run.get(name, run_ts)
 
                 output_path = MUSIC_ROOT_PATH / safe_name
@@ -200,28 +256,31 @@ def run_descargas(new_playlists_download_all: bool = False):
                 playlists = get_artist_playlists(url, output_path)
 
                 stop_all = False
-                processed_albums: set = set()  # P2: evita re-procesar el mismo álbum en este run
                 for pl in playlists:
                     raw_title = pl["title"]  # 👈 NOMBRE REAL del album
                     safe_title = Transform.sanitize_path_component(raw_title)
+                    extra_args: list = []
 
                     if pl.get("split_by_album"):
                         # Canal Topic: una carpeta por álbum (yt-dlp reparte con %(album)s).
-                        # Sin track_number fiable en estos canales; el post-proceso reindexa.
+                        # Sin track_number fiable; el post-proceso reindexa. Se baja a TEMP.
                         logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
                         is_new = not any(p.is_dir() for p in output_path.iterdir())
                         output_template = str(
-                            output_path / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
+                            temp_artist_dir / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
                         )
+                        # No bajar álbumes que YA tenemos en /music (ahorra cómputo y espacio).
+                        # match-filter (salta y continúa) en lugar de --break-on-reject: los
+                        # álbumes existentes están intercalados, no se debe parar al primero.
+                        extra_args += _existing_album_match_filter(output_path)
                     else:
                         logger.info(f"▶ Procesando playlist: {safe_title}")
-
-                        playlist_path = output_path / safe_title
-                        is_new = not playlist_path.exists()
-
-                        playlist_path.mkdir(parents=True, exist_ok=True)
-
-                        output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
+                        # get_artist_playlists ya filtró los álbumes existentes en estos modos.
+                        is_new = not (output_path / safe_title).exists()
+                        temp_album = temp_artist_dir / safe_title
+                        temp_album.mkdir(parents=True, exist_ok=True)
+                        output_template = str(temp_album / "%(autonumber)02d. %(title)s.%(ext)s")
+                        extra_args.append("--break-on-reject")
 
                     cmd = [
                         "yt-dlp",
@@ -234,7 +293,7 @@ def run_descargas(new_playlists_download_all: bool = False):
                         "--embed-thumbnail",
                         "--sleep-interval", "5",
                         "--max-sleep-interval", "10",
-                        "--break-on-reject",
+                        *extra_args,
                         "-o", output_template,
                         pl["url"]
                     ]
@@ -252,17 +311,14 @@ def run_descargas(new_playlists_download_all: bool = False):
                         stop_all = True
                         break
 
-                    # P2: post-procesar metadatos EN CUANTO el álbum termina, sin esperar
-                    # a que acabe el artista completo. En modo Topic una sola invocación
-                    # crea varias carpetas de álbum → se procesan las nuevas/recién tocadas.
+                    # P2+P3: post-procesar EN TEMP y promover a /music álbum a álbum, en
+                    # cuanto termina su descarga (sin esperar al artista completo). En modo
+                    # Topic una sola invocación crea varias carpetas → se promueven todas.
                     if pl.get("split_by_album"):
-                        for sub in obtener_subcarpetas(output_path).values():
-                            if sub not in processed_albums:
-                                procesar_album(sub)
-                                processed_albums.add(sub)
+                        for sub in list(obtener_subcarpetas(temp_artist_dir).values()):
+                            _promote_album(sub, output_path)
                     else:
-                        procesar_album(playlist_path)
-                        processed_albums.add(playlist_path)
+                        _promote_album(temp_artist_dir / safe_title, output_path)
 
                 if stop_all:
                     # Error crítico (p.ej. bloqueo de IP): detener TODO el run, pero
@@ -287,6 +343,9 @@ def run_descargas(new_playlists_download_all: bool = False):
                 # (p.ej. RuntimeError de yt-dlp por un exit code no reconocido).
                 logger.error(f"❌ Error procesando '{name}', se omite y se continúa: {e}")
                 continue
+            finally:
+                # Limpia el temporal del artista (parciales, descartados, sobrantes).
+                shutil.rmtree(temp_artist_dir, ignore_errors=True)
 
         _save_last_run(last_run)
         logger.info("✅ Proceso completado.")
