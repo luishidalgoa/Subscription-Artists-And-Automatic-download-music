@@ -13,7 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ---- yt-dlp ----
 # Es mejor dejar que pip lo gestione para que las dependencias de Python
 # que yt-dlp pueda necesitar estén presentes.
-RUN pip install --no-cache-dir -U yt-dlp
+# YTDLP_RELEASE es un "cache-buster": el workflow yt-dlp-watch lo cambia cuando hay
+# una nueva release de yt-dlp, invalidando esta capa para que `-U` reinstale la última.
+ARG YTDLP_RELEASE=latest
+RUN echo "yt-dlp release: ${YTDLP_RELEASE}" && pip install --no-cache-dir -U yt-dlp
 
 # ---- usuario no root ----
 RUN useradd -u 1000 -m luish

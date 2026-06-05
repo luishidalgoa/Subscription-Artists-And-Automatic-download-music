@@ -1,0 +1,96 @@
+name: Watch yt-dlp & rebuild
+
+# Mantiene yt-dlp fresco SIN esperar a un release de la app. yt-dlp publica muy a
+# menudo y, al correr el contenedor como usuario non-root, no puede autoactualizarse
+# en runtime. Solución: sondear a diario la última versión publicada de yt-dlp y, SOLO
+# si hay una nueva, reconstruir la imagen arm64 y publicar `:latest` en GHCR (Watchtower
+# la despliega en la Pi en ~5 min).
+#
+# GitHub no permite suscribirse por webhook a releases de OTRO repo sin infra extra, así
+# que usamos un cron de sondeo: es el equivalente práctico a "avísame cuando salga".
+
+on:
+  schedule:
+    - cron: '0 6 * * *'      # diario, 06:00 UTC
+  workflow_dispatch: {}       # disparo manual desde la pestaña Actions
+
+env:
+  IMAGE: ghcr.io/luishidalgoa/yt-subs
+
+jobs:
+  check:
+    name: Comprobar última yt-dlp
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.cmp.outputs.changed }}
+      latest: ${{ steps.cmp.outputs.latest }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Comparar release de yt-dlp con el marcador
+        id: cmp
+        run: |
+          latest=$(curl -fsSL https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | jq -r .tag_name)
+          current=$(cat .github/yt-dlp-version.txt 2>/dev/null | tr -d '[:space:]')
+          echo "Última yt-dlp: '$latest' | Última construida: '$current'"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ -n "$latest" ] && [ "$latest" != "null" ] && [ "$latest" != "$current" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "→ Hay nueva versión: se reconstruirá."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "→ Sin cambios: no se reconstruye."
+          fi
+
+  rebuild:
+    name: Reconstruir y publicar :latest
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-24.04-arm      # arm64 nativo (igual que docker-publish.yml)
+    timeout-minutes: 30
+    permissions:
+      contents: write              # commit del marcador de versión
+      packages: write              # push a GHCR
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build timestamp
+        id: ts
+        run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push (linux/arm64, :latest)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          # Publica :latest (lo que sigue Watchtower) y una etiqueta trazable por versión
+          # de yt-dlp para poder hacer rollback.
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:ytdlp-${{ needs.check.outputs.latest }}
+          build-args: |
+            YTDLP_RELEASE=${{ needs.check.outputs.latest }}
+            APP_VERSION=ytdlp-${{ needs.check.outputs.latest }}
+            APP_COMMIT=${{ github.sha }}
+            APP_BUILD_TIME=${{ steps.ts.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Registrar versión construida
+        run: |
+          echo "${{ needs.check.outputs.latest }}" > .github/yt-dlp-version.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/yt-dlp-version.txt
+          git commit -m "ci: rebuild :latest con yt-dlp ${{ needs.check.outputs.latest }} [skip ci]" || echo "marcador sin cambios"
+          git push origin HEAD:${{ github.ref_name }}
