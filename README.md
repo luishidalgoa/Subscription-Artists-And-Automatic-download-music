@@ -258,6 +258,17 @@ En la carpeta **config/** crea el archivo **artists.json**:
 ]
 ````
 
+El campo **`channel_url`** admite varios formatos (YouTube y YouTube Music):
+
+| Tipo de URL | Ejemplo | Comportamiento |
+|---|---|---|
+| Canal con pestaña *releases* | `https://www.youtube.com/@aitana/releases` | Un álbum por cada lanzamiento (recomendado). |
+| Canal/artista de YouTube Music | `https://music.youtube.com/channel/UC...` | Se resuelve a la pestaña `/releases` del mismo canal → un álbum por lanzamiento. |
+| Álbum o playlist suelto | `https://music.youtube.com/playlist?list=OLAK5uy_...` | Se descarga como un único álbum. |
+| Canal "- Topic" sin releases | `https://music.youtube.com/channel/UC...` | Sus pistas sueltas se agrupan en un único álbum con el nombre del canal. |
+
+> Los enlaces de **YouTube Music** (`music.youtube.com`) se normalizan automáticamente a `www.youtube.com` (yt-dlp no los soporta de forma directa, pero el ID de canal es el mismo).
+
 #### 2.2 last_run.json
 En la carpeta **config/** crea el archivo **last_run.json**:  
 > El archivo **last_run.json** describe la última vez que se comprobaron cambios en el artista.  

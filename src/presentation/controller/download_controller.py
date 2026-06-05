@@ -13,11 +13,94 @@ from src.infrastructure.service.yt_dlp_service import run_yt_dlp
 from src.infrastructure.system.directory_utils import obtener_subcarpetas
 from pathlib import Path
 
+def _to_www(url: str) -> str:
+    """
+    Normaliza dominios de YouTube Music a www.youtube.com.
+
+    yt-dlp no soporta music.youtube.com directamente (redirige internamente), así que
+    lo hacemos explícito para poder construir la pestaña /releases del mismo canal.
+    """
+    return (
+        url.replace("https://music.youtube.com", "https://www.youtube.com")
+           .replace("http://music.youtube.com", "https://www.youtube.com")
+    )
+
+
+def _build_release_candidates(url: str) -> list[str]:
+    """
+    URLs candidatas (en orden de preferencia) para listar los lanzamientos de un artista.
+
+    - Para un enlace de canal/artista (incluido YouTube Music) se intenta primero la
+      pestaña /releases en www.youtube.com, que agrupa los lanzamientos como playlists
+      (un álbum por release). Es el comportamiento ya existente del proyecto.
+    - Si ese canal no tiene pestaña /releases (p.ej. canales "- Topic"), se cae a la
+      propia URL del canal, que devuelve pistas sueltas → se tratan como un álbum único.
+    - Para un enlace directo de playlist/álbum (music.youtube.com/playlist?list=...) se
+      usa tal cual → álbum único.
+    """
+    www = _to_www(url)
+    is_playlist_link = "list=" in www
+    candidates: list[str] = []
+
+    if not is_playlist_link:
+        base = www.split("?")[0].rstrip("/")
+        for tab in ("/releases", "/videos", "/featured", "/playlists", "/albums", "/streams"):
+            if base.endswith(tab):
+                base = base[: -len(tab)]
+                break
+        candidates.append(base + "/releases")
+
+    if www not in candidates:
+        candidates.append(www)
+
+    return candidates
+
+
+def _flat_dump(url: str) -> dict | None:
+    """Devuelve el JSON agregado (yt-dlp --flat-playlist -J) de una URL, o None si falla."""
+    cmd = [
+        "yt-dlp",
+        "--cookies", str(COOKIES_FILE),
+        "-J", "--flat-playlist",
+        url,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def _clean_album_title(title: str) -> str:
+    """Limpia títulos auto-generados de canales (p.ej. 'Uploads from X - Topic')."""
+    t = (title or "").strip()
+    if t.lower().startswith("uploads from "):
+        t = t[len("uploads from "):]
+    for suffix in (" - Topic", " – Topic", " - Tema"):
+        if t.endswith(suffix):
+            t = t[: -len(suffix)]
+    return t.strip() or "Desconocido"
+
+
+def _is_already_downloaded(title: str, subfolders: dict) -> bool:
+    """True si ya existe una carpeta para ese título (comparando sanitizado y normalizado)."""
+    safe_title = Transform.sanitize_path_component(title)
+    normalized_title = Transform.normalize_name(title)
+    return (
+        safe_title in subfolders
+        or normalized_title in {Transform.normalize_name(k) for k in subfolders}
+    )
+
+
 def get_artist_playlists(url: str, artist_root: Path):
     """
-    Devuelve playlists nuevas comparando correctamente contra filesystem.
-    """
+    Devuelve los álbumes/lanzamientos NUEVOS de un artista comparando contra el filesystem.
 
+    Soporta:
+      - Canales con pestaña /releases (YouTube y YouTube Music) → un álbum por release.
+      - Enlaces directos de playlist/álbum (incl. music.youtube.com/playlist?list=...).
+      - Canales que solo exponen pistas sueltas (p.ej. canales "- Topic") → álbum único.
+    """
     # Carpeta existente real (sanitizada)
     subfolders = {
         Transform.sanitize_path_component(p.name): p
@@ -25,45 +108,39 @@ def get_artist_playlists(url: str, artist_root: Path):
         if p.is_dir()
     }
 
-    cmd = [
-        "yt-dlp",
-        "--cookies", str(COOKIES_FILE),
-        "-j", "--flat-playlist",
-        url
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    for candidate in _build_release_candidates(url):
+        data = _flat_dump(candidate)
+        if not data:
+            continue
 
-    playlists = []
+        entries = data.get("entries") or []
+        if not entries:
+            continue
 
-    for line in result.stdout.splitlines():
-        try:
-            data = json.loads(line)
+        playlist_entries = [e for e in entries if "playlist" in (e.get("url") or "")]
 
-            if data.get("url") and "playlist" in data.get("url", ""):
-                raw_title = data.get("title", f"Playlist_{data['id']}")
-
-                safe_title = Transform.sanitize_path_component(raw_title)
-                normalized_title = Transform.normalize_name(raw_title)
-
-                # 🔥 AQUÍ ES DONDE VA TU BLOQUE
-                exists = (
-                    safe_title in subfolders
-                    or normalized_title in {
-                        Transform.normalize_name(k) for k in subfolders
-                    }
-                )
-
-                if not exists:
+        # MODO ÁLBUMES: el canal lista sus lanzamientos como playlists (pestaña /releases)
+        if playlist_entries:
+            playlists = []
+            for item in playlist_entries:
+                raw_title = item.get("title", f"Playlist_{item.get('id')}")
+                if not _is_already_downloaded(raw_title, subfolders):
                     playlists.append({
-                        "id": data["id"],
+                        "id": item["id"],
                         "title": raw_title,
-                        "url": data["url"]
+                        "url": item["url"],
                     })
+            return playlists
 
-        except json.JSONDecodeError:
-            logger.warning(f"No se pudo parsear línea de yt-dlp: {line}")
+        # MODO ÁLBUM ÚNICO: playlist/álbum suelto o canal que solo expone pistas sueltas.
+        # La URL completa se baja como un único álbum nombrado con el título del canal/playlist.
+        raw_title = _clean_album_title(data.get("title"))
+        if _is_already_downloaded(raw_title, subfolders):
+            return []
+        return [{"id": data.get("id") or raw_title, "title": raw_title, "url": candidate}]
 
-    return playlists
+    logger.warning(f"No se obtuvieron entradas de yt-dlp para {url}")
+    return []
 
 
 def run_descargas(new_playlists_download_all: bool = False):
