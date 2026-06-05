@@ -1,17 +1,23 @@
 #!/bin/bash
+# Actualización MANUAL al modelo pull-based.
+#
+# La imagen la construye CI (GitHub Actions) y se publica en GHCR; en condiciones
+# normales el Watchtower del host actualiza el contenedor solo (~5 min). Este script
+# fuerza la actualización inmediata: descarga la última :latest y recrea el contenedor.
+# Ya NO compila nada en la Pi ni necesita `git pull`.
 
-# Nombre del servicio/contenedor de tu proyecto
+set -e
+
 CONTAINER_NAME="yt_subs"
 
-echo "🚀 Deteniendo contenedores..."
-docker compose down
+echo "📥 Descargando la última imagen desde GHCR..."
+docker compose pull
 
-echo "📦 Actualizando repositorio..."
-git pull
-
-echo "🟢 Levantando contenedores en background..."
+echo "🟢 Recreando el contenedor con la nueva imagen..."
 docker compose up -d
 
-echo "💻 Conectando al contenedor $CONTAINER_NAME..."
-docker exec -it $CONTAINER_NAME /bin/bash
+echo "🧹 Limpiando imágenes antiguas..."
+docker image prune -f
 
+echo "✅ Listo. Mostrando logs (Ctrl+C para salir)..."
+docker logs -f "$CONTAINER_NAME"

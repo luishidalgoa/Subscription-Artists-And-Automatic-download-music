@@ -1,0 +1,126 @@
+name: Build & publish Docker image
+
+# Construye la imagen de producción para la Raspberry Pi (linux/arm64) y la sube
+# a GitHub Container Registry (GHCR); después publica un GitHub Release.
+#
+# IMPORTANTE: NO se ejecuta en cada push a main. Solo se ejecuta cuando declaras
+# una versión pública empujando un tag `vX.Y.Z` (ver RELEASING abajo), o cuando lo
+# lanzas a mano desde la pestaña Actions. En la Pi, Watchtower hace el
+# `docker compose pull` de la imagen — no se compila nada en el dispositivo.
+#
+#   RELEASING — para publicar una versión pública:
+#     git tag v1.2.0 && git push origin v1.2.0
+#   (opcional: sincroniza también la versión en setup.py)
+#
+# REQUISITO: el paquete GHCR `yt-subs` debe ser PÚBLICO (o configurar credenciales
+# de pull en la Pi) para que Watchtower pueda hacer pull de `:latest` sin auth.
+# GitHub → tu perfil → Packages → yt-subs → Package settings → Change visibility.
+
+on:
+  push:
+    tags: ['v*']                 # solo los tags de versión disparan el build — NO los push a main
+  workflow_dispatch: {}          # permite builds manuales de prueba desde la pestaña Actions
+
+env:
+  IMAGE: ghcr.io/luishidalgoa/yt-subs
+
+jobs:
+  build:
+    name: Build & push image
+    # Runner arm64 nativo (gratis en repos públicos): construye la imagen de la Pi
+    # sin emulación QEMU. QEMU se colgaba aleatoriamente ("uncaught target signal 4
+    # - Illegal instruction") agotando el timeout completo; arm64 nativo elimina ese
+    # fallo y es mucho más rápido (minutos en vez de decenas de minutos emulando).
+    runs-on: ubuntu-24.04-arm
+    # Red de seguridad: si un build se cuelga, falla en 30 min en vez de gastar 6h.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write            # push a GHCR con el GITHUB_TOKEN integrado
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # No hace falta QEMU: el runner ya es arm64, así que la imagen se compila nativa.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          # latest=auto: `latest` se aplica a tags semver limpios (vX.Y.Z) pero NO a
+          # pre-releases (vX.Y.Z-rc.1) — así un release candidate no se despliega solo.
+          flavor: |
+            latest=auto
+          # NOTA: los comentarios deben ir en su PROPIA línea. Desde metadata-action v6
+          # (commentNoInfix), un `#` al final de un valor se mantiene como parte del
+          # valor en vez de eliminarse — un comentario inline corrompería el tag.
+          tags: |
+            # 1.2.3 — la versión pública
+            type=semver,pattern={{version}}
+            # 1.2
+            type=semver,pattern={{major}}.{{minor}}
+            # sha-1a2b3c4 — pin para rollback
+            type=sha,format=short
+            # p.ej. "main" — solo en builds de dispatch manual
+            type=ref,event=branch
+
+      - name: Build timestamp
+        id: ts
+        run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push (linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Se hornean en la imagen como variables de entorno para trazabilidad
+          # (steps.meta.outputs.version es "X.Y.Z" en un tag v*, o el nombre de la
+          # rama en un dispatch manual).
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
+            APP_BUILD_TIME=${{ steps.ts.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Solo en un tag de versión: publica un GitHub Release con notas auto-generadas y
+  # las instrucciones de pull. La imagen vive en GHCR; el Release es el changelog
+  # humano + el puntero a la versión.
+  release:
+    name: GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write            # crear el GitHub Release
+    steps:
+      - name: Create the Release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true     # changelog desde PRs/commits fusionados
+          body: |
+            ## 🐳 Imagen Docker
+            Publicada en GHCR para `linux/arm64`:
+            ```bash
+            docker pull ghcr.io/luishidalgoa/yt-subs:${{ needs.build.outputs.version }}
+            # tag rodante que sigue Watchtower:
+            docker pull ghcr.io/luishidalgoa/yt-subs:latest
+            ```
+            En la Raspberry Pi el deploy es automático — Watchtower detecta la nueva
+            `:latest` en ~5 min. Para aplicarla al instante:
+            `docker compose pull && docker compose up -d`.

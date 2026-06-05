@@ -1,0 +1,19 @@
+# Mantiene la imagen limpia en builds locales (en CI el contexto es el checkout de
+# git, pero esto evita hornear estado/basura al hacer `docker compose build` local).
+.git
+.github
+**/__pycache__
+*.pyc
+*.pyo
+
+# Estado en runtime y datos (se montan como volúmenes, no deben ir en la imagen)
+data/
+config/artists.json
+config/last_run.json
+config/metadata_songs_cache.json
+config/_cookies.txt
+
+# Docs y scripts de host
+*.md
+update.sh
+docker-compose.yml

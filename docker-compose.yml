@@ -1,17 +1,48 @@
 services:
   yt-subs:
+    # Imagen construida por CI (GitHub Actions) y publicada en GHCR.
+    # Ya NO se compila en la Pi: Watchtower hace pull de la nueva :latest.
+    image: ghcr.io/luishidalgoa/yt-subs:latest
     container_name: yt_subs
-    build:
-      context: .
-      dockerfile: Dockerfile
     user: "1000:1000"
+    restart: unless-stopped
+
+    # Watchtower (el del host, agnóstico por etiqueta) auto-actualiza este
+    # contenedor cuando hay una imagen :latest nueva en GHCR. NO levantamos un
+    # segundo Watchtower aquí para no duplicar/competir con el del host: basta con
+    # esta etiqueta y el Watchtower existente (WATCHTOWER_LABEL_ENABLE=true) lo gestiona.
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
     environment:
       - TZ=Europe/Madrid
       - YT_COMMAND=boot
+
     volumes:
       - /mnt/nextcloud_hdd_1/Navidrome/music:/music
       - ./config:/Workspace/config
       - ./data:/Workspace/data
-      - ./src:/Workspace/src
       - /mnt/nextcloud_hdd_1/Navidrome/temp:/Workspace/temp
-    restart: unless-stopped
+      # NOTA: en producción NO se monta ./src — el código vive dentro de la imagen
+      # para que las actualizaciones de Watchtower surtan efecto. Para desarrollo
+      # local con código en vivo, descomenta esta línea y el bloque `build:` de abajo
+      # y usa `docker compose up --build`:
+      # - ./src:/Workspace/src
+
+    # Build local de desarrollo (sin CI). Descomenta para `docker compose build`:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Despliegue (modelo pull-based, sin compilar en la Pi):
+#   1. CI construye y publica la imagen al empujar un tag vX.Y.Z
+#      (ver .github/workflows/docker-publish.yml).
+#   2. El Watchtower del host detecta la nueva :latest (~5 min) y recrea yt_subs.
+#
+#   Primer despliegue / forzar actualización inmediata:
+#     docker compose pull && docker compose up -d
+#
+#   (Watchtower solo actualiza contenedores YA en marcha, así que el primer
+#    `docker compose pull && up -d` hay que hacerlo a mano una vez.)
+# ─────────────────────────────────────────────────────────────────────────────
