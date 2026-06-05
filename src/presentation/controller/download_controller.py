@@ -132,9 +132,23 @@ def get_artist_playlists(url: str, artist_root: Path):
                     })
             return playlists
 
-        # MODO ÁLBUM ÚNICO: playlist/álbum suelto o canal que solo expone pistas sueltas.
-        # La URL completa se baja como un único álbum nombrado con el título del canal/playlist.
         raw_title = _clean_album_title(data.get("title"))
+
+        # MODO CANAL TOPIC: el canal (p.ej. "X - Topic") no agrupa en playlists, solo
+        # expone pistas sueltas, pero CADA pista trae su campo `album` en los metadatos.
+        # Dejamos que yt-dlp reparta la descarga en una carpeta por álbum (%(album)s) en
+        # vez de volcar todo en una sola carpeta con el nombre del artista.
+        is_playlist_link = "list=" in candidate
+        if not is_playlist_link:
+            return [{
+                "id": data.get("id") or raw_title,
+                "title": raw_title,
+                "url": candidate,
+                "split_by_album": True,
+            }]
+
+        # MODO ÁLBUM ÚNICO: enlace directo de playlist/álbum suelto (list=...).
+        # Se baja como un único álbum nombrado con el título de la playlist.
         if _is_already_downloaded(raw_title, subfolders):
             return []
         return [{"id": data.get("id") or raw_title, "title": raw_title, "url": candidate}]
@@ -164,14 +178,24 @@ def run_descargas(new_playlists_download_all: bool = False):
             for pl in playlists:
                 raw_title = pl["title"]  # 👈 NOMBRE REAL del album
                 safe_title = Transform.sanitize_path_component(raw_title)
-                logger.info(f"▶ Procesando playlist: {safe_title}")
 
-                playlist_path = output_path / safe_title
-                is_new = not playlist_path.exists()
+                if pl.get("split_by_album"):
+                    # Canal Topic: una carpeta por álbum (yt-dlp reparte con %(album)s).
+                    # Sin track_number fiable en estos canales; el post-proceso reindexa.
+                    logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
+                    is_new = not any(p.is_dir() for p in output_path.iterdir())
+                    output_template = str(
+                        output_path / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
+                    )
+                else:
+                    logger.info(f"▶ Procesando playlist: {safe_title}")
 
-                playlist_path.mkdir(parents=True, exist_ok=True)
+                    playlist_path = output_path / safe_title
+                    is_new = not playlist_path.exists()
 
-                output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
+                    playlist_path.mkdir(parents=True, exist_ok=True)
+
+                    output_template = str(playlist_path / "%(autonumber)02d. %(title)s.%(ext)s")
 
                 cmd = [
                     "yt-dlp",
