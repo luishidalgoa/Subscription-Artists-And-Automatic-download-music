@@ -185,7 +185,6 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         "-j",
         "--skip-download",
         "--js-runtimes", "node",
-        "--extractor-args", "youtube:player_client=android",
         "--no-warnings",
         "--check-formats",
         url
