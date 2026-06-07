@@ -267,8 +267,12 @@ def run_descargas(new_playlists_download_all: bool = False):
                         # Sin track_number fiable; el post-proceso reindexa. Se baja a TEMP.
                         logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
                         is_new = not any(p.is_dir() for p in output_path.iterdir())
+                        # Prefijo %(playlist_index)s: los canales Topic NO traen track_number
+                        # y el índice es global del canal, pero las pistas de un álbum vienen
+                        # consecutivas → el prefijo (zero-padded) preserva el orden REAL del
+                        # álbum en disco. El post-proceso lo reescribe a 1..N por álbum.
                         output_template = str(
-                            temp_artist_dir / "%(album|Sin álbum)s" / "%(title)s.%(ext)s"
+                            temp_artist_dir / "%(album|Sin álbum)s" / "%(playlist_index)05d. %(title)s.%(ext)s"
                         )
                         # No bajar álbumes que YA tenemos en /music (ahorra cómputo y espacio).
                         # match-filter (salta y continúa) en lugar de --break-on-reject: los

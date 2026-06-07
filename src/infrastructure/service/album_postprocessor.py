@@ -1,4 +1,5 @@
 # app/service/download_service.py
+import re
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import APIC, ID3, ID3NoHeaderError, error
 from pathlib import Path
@@ -59,7 +60,19 @@ def actualizar_portada(songs_files: list[Path], artista: str):
         logger.info(f"[INFO] Portada actualizada en {mp3_file.name}")
 
 
+# Prefijo numérico ya existente en el nombre (p.ej. "01. ", "00007. ") para poder
+# normalizarlo a 1..N por álbum sin acumular prefijos en sucesivas pasadas.
+_TRACK_PREFIX_RE = re.compile(r"^\d+\.\s+")
+
+
 def actualizar_indice_pista(songs_files: list[Path]) -> list[Path]:
+    """Fija el tag tracknumber (1..N) y renombra el fichero con prefijo limpio "NN. ".
+
+    `songs_files` viene ordenado por nombre (extract_files), y como la descarga deja un
+    prefijo numérico zero-padded, ese orden == orden real del álbum. Aquí se reescribe a
+    un índice contiguo por-álbum, tanto en el tag como en el nombre de fichero, de modo
+    que Topic y releases queden consistentes (1..N) y Navidrome los muestre en orden.
+    """
     renombrados = []
     for i, archivo in enumerate(songs_files, start=1):
         try:
@@ -69,6 +82,14 @@ def actualizar_indice_pista(songs_files: list[Path]) -> list[Path]:
 
         audio["tracknumber"] = str(i)
         audio.save(archivo)
+
+        # Renombrar a "NN. <título sin prefijo previo>" (idempotente: si ya está bien, no toca).
+        base = _TRACK_PREFIX_RE.sub("", archivo.name)
+        destino = archivo.with_name(f"{i:02d}. {base}")
+        if destino != archivo and not destino.exists():
+            archivo.rename(destino)
+            archivo = destino
+
         renombrados.append(archivo)
 
     return renombrados
