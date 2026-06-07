@@ -186,7 +186,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         "--skip-download",
         "--js-runtimes", "node",
         "--no-warnings",
-        "--check-formats",
+        "--sleep-requests", "1.5",
         url
     ]
 
