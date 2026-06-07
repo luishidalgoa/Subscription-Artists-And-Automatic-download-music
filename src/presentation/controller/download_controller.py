@@ -289,6 +289,10 @@ def run_descargas(new_playlists_download_all: bool = False):
                         # Sin un runtime JS, yt-dlp cae al cliente web y YouTube lo limita
                         # ("Video unavailable... rate-limited"). node va instalado en la imagen.
                         "--js-runtimes", "node",
+                        # Solver EJS oficial: node resuelve el challenge JS (n-sig/signature)
+                        # en vez de caer al cliente android, que YouTube marca como bot y
+                        # devuelve "Video unavailable" en lotes grandes (p.ej. canales Topic).
+                        "--remote-components", "ejs:github",
                         # Silencia los warnings benignos de "Signature/n challenge solving
                         # failed" (el audio se baja igual). Los ERRORES siguen visibles.
                         "--no-warnings",

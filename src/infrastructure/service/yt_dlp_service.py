@@ -185,6 +185,7 @@ def fetch_raw_metadata(url: str) -> Dict | None:
         "-j",
         "--skip-download",
         "--js-runtimes", "node",
+        "--remote-components", "ejs:github",  # solver EJS: evita fallback android (bot → "Video unavailable")
         "--no-warnings",
         "--sleep-requests", "1.5",
         url

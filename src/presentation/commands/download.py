@@ -70,6 +70,7 @@ class DownloadCommand(BaseCommand):
             "yt-dlp",
             "--cookies", str(COOKIES_FILE),
             "--js-runtimes", "node",   # sin runtime JS, YouTube limita ("rate-limited")
+            "--remote-components", "ejs:github",  # solver EJS oficial: evita el fallback android (bot → "Video unavailable")
             "--no-warnings",           # silencia warnings benignos del challenge JS
             "--quiet",
             "--print", yt_dlp_service.PROGRESS_PRINT,  # progreso por canción (run_yt_dlp lo pinta)
