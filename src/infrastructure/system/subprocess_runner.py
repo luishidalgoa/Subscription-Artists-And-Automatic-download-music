@@ -79,13 +79,19 @@ def run_subprocess_with_detectors(
                     success = False
                 break
 
-    # Captura errores desconocidos
+    # returncode != 0 sin detector crítico = FALLO PARCIAL, no fatal: en un lote grande
+    # (canales Topic con cientos de pistas) es normal que alguna pista falle (fuente
+    # corrupta → ffmpeg "Invalid data", vídeo retirado, etc.) y yt-dlp salga con código 1
+    # aunque haya bajado bien el resto. Se marca success=False (NO crítico) pero NO se
+    # lanza excepción: así el caller promociona lo que SÍ se descargó. Antes se hacía
+    # `raise`, el `except` del artista saltaba y el `finally` borraba TODO el temp →
+    # se perdían cientos de pistas buenas por una sola mala.
     if returncode != 0 and success:
-        logger.error(
-            f"⚠️ Comando falló con código {returncode} "
-            f"pero ningún detector lo reconoció. Salida parcial: {detected_error or 'ninguno'}, full output:\n{full_output}"
+        logger.warning(
+            f"⚠️ yt-dlp terminó con código {returncode} (fallos parciales; se conserva "
+            f"lo descargado). Última señal: {detected_error or 'ninguna'}"
         )
-        raise RuntimeError("Proceso terminado con error")
+        success = False
 
     return full_output, (success, critical), detected_error, returncode
 

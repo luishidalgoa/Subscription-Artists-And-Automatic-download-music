@@ -340,7 +340,13 @@ def run_descargas(new_playlists_download_all: bool = False):
                     # Topic una sola invocación crea varias carpetas → se promueven todas.
                     if pl.get("split_by_album"):
                         for sub in list(obtener_subcarpetas(temp_artist_dir).values()):
-                            _promote_album(sub, output_path)
+                            # Aísla cada álbum: si uno falla al post-procesar/mover, no debe
+                            # impedir promover los demás (antes una excepción aquí saltaba al
+                            # except del artista y el finally borraba TODO el temp restante).
+                            try:
+                                _promote_album(sub, output_path)
+                            except Exception as e:
+                                logger.error(f"⚠ No se pudo promover el álbum '{sub.name}', se continúa: {e}")
                     else:
                         _promote_album(temp_artist_dir / safe_title, output_path)
 
