@@ -266,7 +266,12 @@ def run_descargas(new_playlists_download_all: bool = False):
                         # Canal Topic: una carpeta por álbum (yt-dlp reparte con %(album)s).
                         # Sin track_number fiable; el post-proceso reindexa. Se baja a TEMP.
                         logger.info(f"▶ Procesando canal Topic por álbumes: {safe_title}")
-                        is_new = not any(p.is_dir() for p in output_path.iterdir())
+                        # En Topic el match-filter (album!=existentes) es AUTORITATIVO sobre
+                        # qué álbumes faltan. NO se filtra por fecha: los álbumes ausentes
+                        # suelen ser antiguos y --dateafter los bloquearía → con la carpeta
+                        # del artista no vacía no se descargaba nada (bug). Sin fecha, yt-dlp
+                        # escanea el canal y el match-filter salta los que ya están.
+                        usar_dateafter = False
                         # Prefijo %(playlist_index)s: los canales Topic NO traen track_number
                         # y el índice es global del canal, pero las pistas de un álbum vienen
                         # consecutivas → el prefijo (zero-padded) preserva el orden REAL del
@@ -282,6 +287,8 @@ def run_descargas(new_playlists_download_all: bool = False):
                         logger.info(f"▶ Procesando playlist: {safe_title}")
                         # get_artist_playlists ya filtró los álbumes existentes en estos modos.
                         is_new = not (output_path / safe_title).exists()
+                        # Releases: incremental por fecha, salvo álbum nuevo en run-now (se baja entero).
+                        usar_dateafter = not (is_new and new_playlists_download_all)
                         temp_album = temp_artist_dir / safe_title
                         temp_album.mkdir(parents=True, exist_ok=True)
                         output_template = str(temp_album / "%(autonumber)02d. %(title)s.%(ext)s")
@@ -315,7 +322,7 @@ def run_descargas(new_playlists_download_all: bool = False):
                         pl["url"]
                     ]
 
-                    if not (is_new and new_playlists_download_all):
+                    if usar_dateafter:
                         cmd.insert(-1, "--dateafter")
                         cmd.insert(-1, since_time[:10].replace('-', ''))
 
