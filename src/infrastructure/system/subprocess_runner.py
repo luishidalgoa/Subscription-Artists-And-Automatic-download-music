@@ -41,7 +41,11 @@ def run_subprocess_with_detectors(
 
     # Leer líneas en streaming
     for line in process.stdout:
-        line = line.strip()
+        # OJO: strip() sin argumentos también borra el separador \x1f (Python lo considera
+        # espacio). El template --print de progreso empieza por \x1f, así que un strip()
+        # normal lo eliminaba y el renderer no reconocía las líneas → no se veía ni el
+        # álbum ni el progreso por canción. Se recortan solo los blancos "de verdad".
+        line = line.strip(" \t\r\n\v\f")
         if line:
             if line_callback:
                 try:

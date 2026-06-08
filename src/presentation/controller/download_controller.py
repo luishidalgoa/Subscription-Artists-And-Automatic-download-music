@@ -319,6 +319,16 @@ def run_descargas(new_playlists_download_all: bool = False):
 
                 playlists = get_artist_playlists(url, output_path)
 
+                # Álbumes/playlists EXTRA registrados a mano en artists.json (campo "albums":
+                # lista de URLs). Útil para lanzamientos que el feed del canal Topic NO expone
+                # (p.ej. SEGA no tiene pestaña /releases ni /playlists). Cada URL se trata como
+                # un álbum único y se sincroniza en la misma carpeta del artista.
+                for extra_url in (artist.get("albums") or []):
+                    try:
+                        playlists += get_artist_playlists(extra_url, output_path)
+                    except Exception as e:
+                        logger.warning(f"⚠ No se pudo procesar el álbum extra {extra_url} de {name}: {e}")
+
                 stop_all = False
                 for pl in playlists:
                     raw_title = pl["title"]  # 👈 NOMBRE REAL del album

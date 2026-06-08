@@ -45,11 +45,15 @@ class DownloadCommand(BaseCommand):
         playlist_title = None
 
         if is_playlist:
-            # 🔥 Sacamos el título REAL de la playlist
+            # 🔥 Sacamos el título REAL de la playlist.
+            # --flat-playlist: NO resuelve cada vídeo (solo lista) → el título sale al
+            # instante. Sin él, --dump-single-json hacía extracción profunda de cada pista
+            # y se pasaba de los 120s (timeout → warning) en álbumes grandes.
             cmd_info = [
                 "yt-dlp",
                 "--cookies", str(COOKIES_FILE),
                 "--js-runtimes", "node",
+                "--flat-playlist",
                 "--dump-single-json",
                 url
             ]
