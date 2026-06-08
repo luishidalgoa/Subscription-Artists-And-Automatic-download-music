@@ -229,6 +229,69 @@ def _promote_album(temp_album: Path, music_artist_dir: Path) -> None:
     logger.info(f"📦 Álbum movido a /music: {dest.name}")
 
 
+# Marcadores que yt-dlp deja para la pista EN CURSO (descargando o convirtiendo):
+#   .part / .part-Frag  → descarga a medias;  .ytdl → metadatos de reanudación;
+#   .temp.<ext>         → conversión de ffmpeg en marcha.
+# Su presencia identifica el ÚNICO álbum que se estaba bajando al cortar.
+_INPROGRESS_MARKERS = (".part", ".ytdl")
+# Restos a borrar de un álbum COMPLETO antes de moverlo (no son audio final).
+_JUNK_MARKERS = (".part", ".ytdl", ".webm", ".temp.mp3", ".temp", ".tmp")
+
+
+def _album_incompleto(album_dir: Path) -> bool:
+    """True si el álbum tiene una pista a medias (marcadores de yt-dlp) o está vacío.
+
+    Un álbum cuyos ficheros son solo audio final (.mp3) se considera COMPLETO. Esto
+    distingue el álbum que se estaba descargando al interrumpir (lo tiene) de los ya
+    terminados (no lo tienen) — sin necesitar saber el número esperado de pistas.
+    """
+    try:
+        names = [p.name.lower() for p in album_dir.iterdir() if p.is_file()]
+    except OSError:
+        return False
+    if not names:
+        return True
+    return any(
+        n.endswith(_INPROGRESS_MARKERS) or ".part-frag" in n or ".temp." in n
+        for n in names
+    )
+
+
+def _limpiar_restos(album_dir: Path) -> None:
+    """Borra restos que no son audio final (.webm/.part/.temp…) de un álbum completo."""
+    try:
+        for p in album_dir.iterdir():
+            n = p.name.lower()
+            if p.is_file() and (n.endswith(_JUNK_MARKERS) or ".part-frag" in n):
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
+def _settle_temp(temp_artist_dir: Path, output_path: Path) -> None:
+    """Asienta el temp de un artista de forma segura ante interrupciones.
+
+    Por cada álbum en TEMP: si está a medias (la pista en curso al cortar) se DESCARTA;
+    si está completo, se limpian restos y se PROMUEVE a /music. Idempotente: tras la
+    primera pasada los completos ya no están y los incompletos se han borrado.
+    """
+    if not temp_artist_dir.exists():
+        return
+    for sub in list(obtener_subcarpetas(temp_artist_dir).values()):
+        try:
+            if _album_incompleto(sub):
+                logger.warning(f"🗑 Álbum a medias (descarga interrumpida), se descarta: {sub.name}")
+                shutil.rmtree(sub, ignore_errors=True)
+            else:
+                _limpiar_restos(sub)
+                _promote_album(sub, output_path)
+        except Exception as e:
+            logger.error(f"⚠ Error al asentar el álbum '{sub.name}', se continúa: {e}")
+
+
 def run_descargas(new_playlists_download_all: bool = False):
     # artists_load/last_run_load degradan a [] / {} ante error → no revientan el bucle.
     artists = artists_load() or []
@@ -335,20 +398,10 @@ def run_descargas(new_playlists_download_all: bool = False):
                         stop_all = True
                         break
 
-                    # P2+P3: post-procesar EN TEMP y promover a /music álbum a álbum, en
-                    # cuanto termina su descarga (sin esperar al artista completo). En modo
-                    # Topic una sola invocación crea varias carpetas → se promueven todas.
-                    if pl.get("split_by_album"):
-                        for sub in list(obtener_subcarpetas(temp_artist_dir).values()):
-                            # Aísla cada álbum: si uno falla al post-procesar/mover, no debe
-                            # impedir promover los demás (antes una excepción aquí saltaba al
-                            # except del artista y el finally borraba TODO el temp restante).
-                            try:
-                                _promote_album(sub, output_path)
-                            except Exception as e:
-                                logger.error(f"⚠ No se pudo promover el álbum '{sub.name}', se continúa: {e}")
-                    else:
-                        _promote_album(temp_artist_dir / safe_title, output_path)
+                # Asienta el temp del artista: promueve a /music los álbumes COMPLETOS y
+                # descarta el que se estaba descargando a medias. Se hace al salir del bucle
+                # (y se repite en finally como red de seguridad ante Ctrl+C / excepción).
+                _settle_temp(temp_artist_dir, output_path)
 
                 if stop_all:
                     # Error crítico (p.ej. bloqueo de IP): detener TODO el run, pero
@@ -374,7 +427,11 @@ def run_descargas(new_playlists_download_all: bool = False):
                 logger.error(f"❌ Error procesando '{name}', se omite y se continúa: {e}")
                 continue
             finally:
-                # Limpia el temporal del artista (parciales, descartados, sobrantes).
+                # Red de seguridad: si se interrumpió (Ctrl+C/excepción) antes del
+                # asentamiento normal, promueve igualmente los álbumes COMPLETOS y
+                # descarta solo el de a-medias (idempotente si ya se asentó arriba).
+                _settle_temp(temp_artist_dir, output_path)
+                # Elimina el temporal ya vacío (sobrantes, descartados).
                 shutil.rmtree(temp_artist_dir, ignore_errors=True)
 
         _save_last_run(last_run)
