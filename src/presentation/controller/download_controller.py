@@ -175,20 +175,35 @@ def _save_last_run(last_run: dict) -> None:
         logger.error(f"No se pudo guardar last_run.json: {e}")
 
 
+# yt-dlp sustituye los caracteres ilegales en el filesystem por equivalentes Unicode al
+# crear la carpeta del álbum (p.ej. ':' → '：', '?' → '？'), pero el metadato `album` que
+# evalúa --match-filter conserva el carácter ASCII original. Revertimos la sustitución
+# para que la igualdad album!=<carpeta> compare contra el nombre REAL: si no, un álbum
+# como "...Soundtrack：" (ancho) nunca igualaría a "...Soundtrack:" y se re-descargaría
+# en CADA ejecución (el chequeo al promover lo descartaba luego, pero tras bajarlo entero).
+_YTDLP_NAME_REVERSE = str.maketrans({
+    '：': ':', '？': '?', '＊': '*', '＜': '<', '＞': '>',
+    '＂': '"', '｜': '|', '⧸': '/', '⧹': '\\',
+})
+
+
 def _existing_album_match_filter(music_artist_dir: Path) -> list:
     """`--match-filter` que EXCLUYE de la descarga los álbumes ya presentes en /music.
 
     Usa igualdad exacta (`album!=...`) para no excluir por subcadena (evita perder un
-    álbum nuevo cuyo nombre contenga al de uno existente). Solo incluye nombres seguros
-    para el parser de yt-dlp (sin `&` ni comillas); los demás los atrapa el chequeo
-    autoritativo al mover, sin pérdida de datos. Devuelve [] si no hay nada que excluir.
+    álbum nuevo cuyo nombre contenga al de uno existente). Revierte la sustitución de
+    caracteres que yt-dlp hace en los nombres de carpeta para comparar contra el metadato
+    `album` real. Solo incluye nombres seguros para el parser de yt-dlp (sin `&` ni
+    comillas); los demás los atrapa el chequeo autoritativo al mover, sin pérdida de
+    datos. Devuelve [] si no hay nada que excluir.
     """
     if not music_artist_dir.exists():
         return []
-    safe = [
-        p.name for p in music_artist_dir.iterdir()
-        if p.is_dir() and all(c not in p.name for c in ('&', '"', '\n'))
+    names = [
+        p.name.translate(_YTDLP_NAME_REVERSE)
+        for p in music_artist_dir.iterdir() if p.is_dir()
     ]
+    safe = [n for n in names if all(c not in n for c in ('&', '"', '\n'))]
     if not safe:
         return []
     expr = " & ".join(f"album!={n}" for n in safe)
