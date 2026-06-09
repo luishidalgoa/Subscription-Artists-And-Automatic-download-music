@@ -1,5 +1,6 @@
 # app/controller/download_controller.py
 import json
+import re
 import subprocess
 from src.infrastructure.config.config import ARTISTS_FILE, LAST_RUN_FILE, MUSIC_ROOT_PATH, TEMP_MUSIC_PATH
 from src.infrastructure.system.json_loader import artists_load, last_run_load
@@ -89,6 +90,56 @@ def _clean_album_title(title: str) -> str:
     return t.strip() or "Desconocido"
 
 
+def _extract_channel_id(url: str) -> str | None:
+    """Extrae el ID de canal de YouTube (UC…, 24 chars) de una URL, o None."""
+    m = re.search(r"(UC[0-9A-Za-z_-]{22})", url or "")
+    return m.group(1) if m else None
+
+
+def _ytmusic_releases(channel_id: str) -> list | None:
+    """Discografía COMPLETA de un artista vía la API pública de YouTube Music.
+
+    Devuelve [{"title", "playlistId"}] de TODOS sus álbumes, singles y EPs (cada uno con
+    su playlist `OLAK5uy…`), o None si la API no está disponible o falla.
+
+    Resuelve la causa raíz del under-fetch en canales Topic: YouTube capa el feed de
+    uploads a ~100 pistas (no expone el catálogo entero), así que `get_artist_albums`
+    pagina la discografía completa (cientos de lanzamientos) en lugar de esa ventana.
+    No requiere autenticación (navegación pública) → no usa cookies ni tokens.
+    """
+    try:
+        from ytmusicapi import YTMusic
+    except ImportError:
+        logger.warning("⚠ ytmusicapi no instalado; no se puede enumerar la discografía de YouTube Music")
+        return None
+    try:
+        yt = YTMusic()
+        artist = yt.get_artist(channel_id)
+    except Exception as e:
+        logger.warning(f"⚠ Discografía de YouTube Music no disponible para {channel_id}: {e}")
+        return None
+
+    releases: list = []
+    seen: set = set()
+    # 'albums' = LPs; 'singles' agrupa singles Y EPs. Ambas secciones traen playlistId.
+    for section in ("albums", "singles"):
+        sec = artist.get(section) or {}
+        try:
+            if sec.get("browseId"):
+                items = yt.get_artist_albums(sec["browseId"], sec.get("params"), limit=None)
+            else:
+                items = sec.get("results") or []
+        except Exception as e:
+            logger.warning(f"⚠ No se pudo paginar '{section}' de {channel_id}: {e}")
+            items = sec.get("results") or []
+        for it in items:
+            pid, title = it.get("playlistId"), it.get("title")
+            if pid and title and pid not in seen:
+                seen.add(pid)
+                releases.append({"title": title, "playlistId": pid})
+    return releases or None
+
+
 def _is_already_downloaded(title: str, subfolders: dict) -> bool:
     """True si ya existe una carpeta para ese título (comparando sanitizado y normalizado)."""
     safe_title = Transform.sanitize_path_component(title)
@@ -141,12 +192,35 @@ def get_artist_playlists(url: str, artist_root: Path):
 
         raw_title = _clean_album_title(data.get("title"))
 
-        # MODO CANAL TOPIC: el canal (p.ej. "X - Topic") no agrupa en playlists, solo
-        # expone pistas sueltas, pero CADA pista trae su campo `album` en los metadatos.
-        # Dejamos que yt-dlp reparta la descarga en una carpeta por álbum (%(album)s) en
-        # vez de volcar todo en una sola carpeta con el nombre del artista.
+        # MODO CANAL TOPIC: el canal (p.ej. "X - Topic") no agrupa en playlists.
         is_playlist_link = "list=" in candidate
         if not is_playlist_link:
+            # PREFERENTE: discografía COMPLETA vía la API de YouTube Music. El feed de
+            # uploads de un canal Topic lo capa YouTube a ~100 pistas (no expone el
+            # catálogo entero), así que enumeramos todos los álbumes/singles/EPs del
+            # artista y los tratamos como playlists de álbum únicas → entran por la MISMA
+            # ruta robusta que /releases (dedup tolerante por normalize_name, nombrado y
+            # manejo de errores), sin match-filter frágil.
+            channel_id = _extract_channel_id(url)
+            releases = _ytmusic_releases(channel_id) if channel_id else None
+            if releases:
+                nuevos = [
+                    {
+                        "id": rel["playlistId"],
+                        "title": rel["title"],
+                        "url": f"https://www.youtube.com/playlist?list={rel['playlistId']}",
+                    }
+                    for rel in releases
+                    if not _is_already_downloaded(rel["title"], subfolders)
+                ]
+                logger.info(
+                    f"▶ Discografía YouTube Music: {len(releases)} lanzamientos totales, "
+                    f"{len(nuevos)} nuevos para descargar"
+                )
+                return nuevos
+
+            # FALLBACK (API caída): feed de uploads capado, repartido por álbum con
+            # %(album)s. yt-dlp reparte la descarga en una carpeta por álbum.
             return [{
                 "id": data.get("id") or raw_title,
                 "title": raw_title,
