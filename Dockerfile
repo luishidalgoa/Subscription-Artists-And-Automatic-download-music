@@ -46,6 +46,15 @@ LABEL org.opencontainers.image.title="yt-subs" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${APP_COMMIT}"
 
+# ---- runtime non-root ----
+# HOME escribible por el uid 1000: lo necesita `pip install --user` del auto-update de
+# yt-dlp en runtime (ver src/infrastructure/service/ytdlp_updater.py). Sin esto, --user
+# resolvería a /.local y fallaría por permisos.
+# PATH antepone ~/.local/bin para que TODOS los comandos (incl. `version`) usen el yt-dlp
+# instalado a nivel de usuario en lugar del de /usr/local cuando exista uno más nuevo.
+ENV HOME=/home/luish \
+    PATH=/home/luish/.local/bin:$PATH
+
 USER 1000:1000
 ENV YT_COMMAND="boot"
 CMD ["sh", "-c", "yt-subs ${YT_COMMAND}"]

@@ -13,6 +13,8 @@ class RunNowCommand(BaseCommand):
 
     def handle(self, parsed_args):
         logger.info("▶ Ejecución de descargas automáticas...")
+        # La comprobación/actualización de yt-dlp ocurre dentro de DownloadJob.run()
+        # (así cubre también el scheduler/boot, no solo este comando manual).
         # Los álbumes nuevos (ausentes en la carpeta del artista) se descargan completos;
         # los ya existentes se actualizan de forma incremental por fecha.
         DownloadJob(new_playlists_download_all=True).run()
