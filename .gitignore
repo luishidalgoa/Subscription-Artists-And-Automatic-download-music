@@ -7,3 +7,4 @@
 /config/metadata_songs_cache.json
 /config/_cookies.txt
 /data/
+.env

@@ -1,11 +1,17 @@
 name: Build & publish Docker image
 
-# Construye la imagen de producción para la Raspberry Pi (linux/arm64) y la sube
-# a GitHub Container Registry (GHCR); después publica un GitHub Release.
+# Construye la imagen de producción para el servidor (linux/amd64) y la sube a
+# GitHub Container Registry (GHCR); después publica un GitHub Release.
+#
+# SOLO amd64. Esto nació en una Raspberry Pi y publicaba linux/arm64; desde la
+# migración al x86 no queda una sola máquina ARM que sirva esta imagen, y una
+# variante que nadie arranca solo alarga el build y confunde al que la mire.
+# Si algún día vuelve a haber un equipo ARM, se añade `linux/arm64` a
+# `platforms` — pero leyendo antes la nota del runner, mas abajo.
 #
 # IMPORTANTE: NO se ejecuta en cada push a main. Solo se ejecuta cuando declaras
 # una versión pública empujando un tag `vX.Y.Z` (ver RELEASING abajo), o cuando lo
-# lanzas a mano desde la pestaña Actions. En la Pi, Watchtower hace el
+# lanzas a mano desde la pestaña Actions. En el servidor, Watchtower hace el
 # `docker compose pull` de la imagen — no se compila nada en el dispositivo.
 #
 #   RELEASING — para publicar una versión pública:
@@ -27,11 +33,14 @@ env:
 jobs:
   build:
     name: Build & push image
-    # Runner arm64 nativo (gratis en repos públicos): construye la imagen de la Pi
-    # sin emulación QEMU. QEMU se colgaba aleatoriamente ("uncaught target signal 4
-    # - Illegal instruction") agotando el timeout completo; arm64 nativo elimina ese
-    # fallo y es mucho más rápido (minutos en vez de decenas de minutos emulando).
-    runs-on: ubuntu-24.04-arm
+    # Runner amd64 nativo, que es la arquitectura que se publica: sin emulación.
+    # Esto NO es un detalle de comodidad. Cuando esto compilaba para la Pi desde
+    # un runner x86, QEMU se colgaba aleatoriamente ("uncaught target signal 4 -
+    # Illegal instruction") y agotaba el timeout entero; se resolvió pasando a un
+    # runner ARM nativo. La misma trampa espera al revés: compilar arm64 desde
+    # aquí exigiría QEMU otra vez. Si algún día hace falta esa variante, el
+    # camino bueno es un segundo job en un runner ARM, no emular.
+    runs-on: ubuntu-latest
     # Red de seguridad: si un build se cuelga, falla en 30 min en vez de gastar 6h.
     timeout-minutes: 30
     permissions:
@@ -43,7 +52,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # No hace falta QEMU: el runner ya es arm64, así que la imagen se compila nativa.
+      # No hace falta QEMU: el runner ya es amd64 y es lo único que se publica.
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -80,11 +89,11 @@ jobs:
         id: ts
         run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Build & push (linux/arm64)
+      - name: Build & push (linux/amd64)
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -115,12 +124,12 @@ jobs:
           generate_release_notes: true     # changelog desde PRs/commits fusionados
           body: |
             ## 🐳 Imagen Docker
-            Publicada en GHCR para `linux/arm64`:
+            Publicada en GHCR para `linux/amd64`:
             ```bash
             docker pull ghcr.io/luishidalgoa/yt-subs:${{ needs.build.outputs.version }}
             # tag rodante que sigue Watchtower:
             docker pull ghcr.io/luishidalgoa/yt-subs:latest
             ```
-            En la Raspberry Pi el deploy es automático — Watchtower detecta la nueva
+            En el servidor el deploy es automático — Watchtower detecta la nueva
             `:latest` en ~5 min. Para aplicarla al instante:
             `docker compose pull && docker compose up -d`.

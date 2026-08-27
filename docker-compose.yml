@@ -19,10 +19,10 @@ services:
       - YT_COMMAND=boot
 
     volumes:
-      - /mnt/nextcloud_hdd_1/Navidrome/music:/music
+      - ${YTSUBS_MUSIC:-/mnt/nextcloud_hdd_1/Navidrome/music}:/music
       - ./config:/Workspace/config
       - ./data:/Workspace/data
-      - /mnt/nextcloud_hdd_1/Navidrome/temp:/Workspace/temp
+      - ${YTSUBS_TEMP:-/mnt/nextcloud_hdd_1/Navidrome/temp}:/Workspace/temp
       # NOTA: en producción NO se monta ./src — el código vive dentro de la imagen
       # para que las actualizaciones de Watchtower surtan efecto. Para desarrollo
       # local con código en vivo, descomenta esta línea y el bloque `build:` de abajo
