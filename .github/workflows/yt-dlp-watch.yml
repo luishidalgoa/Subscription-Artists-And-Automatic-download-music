@@ -3,8 +3,8 @@ name: Watch yt-dlp & rebuild
 # Mantiene yt-dlp fresco SIN esperar a un release de la app. yt-dlp publica muy a
 # menudo y, al correr el contenedor como usuario non-root, no puede autoactualizarse
 # en runtime. Solución: sondear a diario la última versión publicada de yt-dlp y, SOLO
-# si hay una nueva, reconstruir la imagen arm64 y publicar `:latest` en GHCR (Watchtower
-# la despliega en la Pi en ~5 min).
+# si hay una nueva, reconstruir la imagen amd64 y publicar `:latest` en GHCR (Watchtower
+# la despliega en el servidor en ~5 min).
 #
 # GitHub no permite suscribirse por webhook a releases de OTRO repo sin infra extra, así
 # que usamos un cron de sondeo: es el equivalente práctico a "avísame cuando salga".
@@ -46,7 +46,7 @@ jobs:
     name: Reconstruir y publicar :latest
     needs: check
     if: needs.check.outputs.changed == 'true'
-    runs-on: ubuntu-24.04-arm      # arm64 nativo (igual que docker-publish.yml)
+    runs-on: ubuntu-latest         # amd64 nativo (igual que docker-publish.yml)
     timeout-minutes: 30
     permissions:
       contents: write              # commit del marcador de versión
@@ -67,11 +67,11 @@ jobs:
         id: ts
         run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Build & push (linux/arm64, :latest)
+      - name: Build & push (linux/amd64, :latest)
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           # Publica :latest (lo que sigue Watchtower) y una etiqueta trazable por versión
           # de yt-dlp para poder hacer rollback.
